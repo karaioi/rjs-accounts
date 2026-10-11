@@ -44,7 +44,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { authClient } from "@/lib/auth/client";
-import { describeAuthError } from "@/lib/auth/errors";
+import { describeAuthError, TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 import { consents } from "@/lib/data/consents";
 import { otpSchema } from "@/lib/validations/otp";
 import { type SignUpValues, signUpSchema } from "@/lib/validations/sign-up";
@@ -171,6 +171,10 @@ export function SignUpForm() {
       const response = await fetch("/api/backend/auth/register", {
         method: "POST",
       });
+      if (response.status === 429) {
+        setError(TOO_MANY_ATTEMPTS);
+        return;
+      }
       if (!response.ok) {
         setError(
           "Your email is verified, but we could not finish registration. Please contact support.",

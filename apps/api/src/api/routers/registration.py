@@ -19,8 +19,14 @@ from ..db import get_session
 from ..models import UserProfile
 from ..schemas import AccountOut
 from ..services.audit import write_audit
+from ..services.rate_limit import enforce
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+#: Registration is idempotent and only reachable with a verified email, so this
+#: is a light guard against a scripted loop rather than a hard funnel.
+REGISTER_LIMIT = 5
+REGISTER_WINDOW_SECONDS = 60 * 60
 
 
 @router.post("/register", response_model=AccountOut)
@@ -34,6 +40,13 @@ def register(
     Safe to retry: an existing profile is returned untouched, so a double-submit
     never resets an approved account.
     """
+    enforce(
+        bucket="auth.register",
+        subject=str(principal.user_id),
+        limit=REGISTER_LIMIT,
+        window_seconds=REGISTER_WINDOW_SECONDS,
+    )
+
     if not principal.email_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

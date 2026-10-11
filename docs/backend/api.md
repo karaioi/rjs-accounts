@@ -12,7 +12,8 @@ apps/api/
 │   └── versions/
 │       ├── 0001_auth_tenancy_schema.py
 │       ├── 0002_seed_rbac.py
-│       └── 0003_user_approval.py
+│       ├── 0003_user_approval.py
+│       └── 0004_rate_limit.py
 ├── .env.example
 ├── pyproject.toml
 └── src/api/
@@ -27,7 +28,7 @@ apps/api/
     ├── routers/                   # me, reference, auth_gate, auth_webhooks,
     │                              #   registration, users, customers,
     │                              #   organizations, members, audit
-    ├── services/                  # permissions, audit, verification
+    ├── services/                  # permissions, audit, verification, rate_limit
     └── scripts/seed_admin.py
 ```
 
@@ -78,6 +79,16 @@ be `active`; a pending/rejected/suspended account gets
 `403 {"detail": "Your account is awaiting administrator approval"}` (header
 `X-Account-Status: pending`). Platform admins must pass the OTP gate but skip the
 approval check.
+
+## Rate limiting
+
+The sign-in gate and registration are rate limited **in FastAPI**
+(`services/rate_limit.py`, counters in `app.rate_limit`); the Managed Auth OTP
+calls are rate limited by the **web auth proxy**. A limited request gets
+`429 {"detail": "Too many attempts. Please wait before trying again."}` with
+`Retry-After` and `X-RateLimit-*` headers, which the relays surface to the
+browser. The routes, windows, and why the policy is split across two layers are
+in [auth-and-tenancy-design.md §13.5](auth-and-tenancy-design.md#135-rate-limiting).
 
 ## Email (OTP + branded templates)
 

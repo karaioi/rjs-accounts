@@ -8,6 +8,12 @@
  * Codes are compared case-insensitively: the API uses `INVALID_EMAIL_OR_PASSWORD`
  * while the thrown error carries `invalid_credentials`.
  */
+
+/** Copy for a `429`, shared by the client flows and the auth proxy so a limit
+ * reads the same whether it was hit at Managed Auth or at our own backend. */
+export const TOO_MANY_ATTEMPTS =
+  "Too many attempts. Please wait a moment and try again.";
+
 const MESSAGES: Record<string, string> = {
   invalid_email_or_password: "Incorrect email or password. Please try again.",
   invalid_credentials: "Incorrect email or password. Please try again.",
@@ -30,7 +36,7 @@ const MESSAGES: Record<string, string> = {
   invalid_otp: "That code isn't right. Check the email and try again.",
   otp_expired: "That code has expired. Request a new one.",
   otp_has_expired: "That code has expired. Request a new one.",
-  too_many_requests: "Too many attempts. Please wait a moment and try again.",
+  too_many_requests: TOO_MANY_ATTEMPTS,
 };
 
 function normalize(error: unknown): { code?: string; message?: string } {

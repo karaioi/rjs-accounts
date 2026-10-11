@@ -18,11 +18,18 @@ from ..auth.deps import Principal, get_principal
 from ..db import get_session
 from ..models import LoginVerification
 from ..schemas import LoginVerificationOut
+from ..services.rate_limit import enforce
 from ..services.verification import is_verified, latest_verification
 
 router = APIRouter(prefix="/auth/login/verification", tags=["auth"])
 
 WINDOW = timedelta(minutes=15)
+
+#: Sign-in OTP limits, matched to `WINDOW`. `start` is one code per password
+#: sign-in, so a handful per window is generous; `complete` allows fat fingers.
+OTP_START_LIMIT = 10
+OTP_COMPLETE_LIMIT = 20
+_RATE_WINDOW_SECONDS = int(WINDOW.total_seconds())
 
 
 def _status(row: LoginVerification | None) -> LoginVerificationOut:
@@ -52,6 +59,13 @@ def start_verification(
     The web client then asks Managed Auth to send the code. Resetting
     `verified_at` means a brand-new sign-in must complete the OTP step again.
     """
+    enforce(
+        bucket="login.verification.start",
+        subject=str(principal.user_id),
+        limit=OTP_START_LIMIT,
+        window_seconds=_RATE_WINDOW_SECONDS,
+    )
+
     now = datetime.now(UTC)
     row = LoginVerification(
         user_id=principal.user_id,
@@ -70,6 +84,13 @@ def complete_verification(
     session: Session = Depends(get_session),
 ) -> LoginVerificationOut:
     """Mark the sign-in verified after the client confirmed the OTP."""
+    enforce(
+        bucket="login.verification.complete",
+        subject=str(principal.user_id),
+        limit=OTP_COMPLETE_LIMIT,
+        window_seconds=_RATE_WINDOW_SECONDS,
+    )
+
     now = datetime.now(UTC)
     row = latest_verification(session, principal.user_id)
     if row is None or row.expires_at < now:

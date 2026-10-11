@@ -8,6 +8,7 @@ from .account import LoginVerification, UserProfile
 from .audit import AuditLog
 from .base import Base
 from .external import MANAGED_TABLES, neon_auth_user
+from .rate_limit import RateLimit
 from .tenancy import (
     Customer,
     Membership,
@@ -27,6 +28,7 @@ __all__ = [
     "Membership",
     "Organization",
     "Permission",
+    "RateLimit",
     "Role",
     "RolePermission",
     "UserProfile",

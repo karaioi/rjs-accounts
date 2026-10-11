@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { apiFetch } from "@/lib/api/server";
+import { apiFetch, relayHeaders } from "@/lib/api/server";
 
 /**
  * Same-origin relay to the FastAPI backend.
@@ -30,18 +30,9 @@ async function forward(
   const response = await apiFetch(`/api/v1/${path.join("/")}${search}`, init);
   const body = await response.text();
 
-  const responseHeaders: Record<string, string> = {
-    "content-type": response.headers.get("content-type") ?? "application/json",
-  };
-  // Surfaced so the UI can tell "needs OTP" apart from a real 403.
-  const verification = response.headers.get("x-login-verification");
-  if (verification) {
-    responseHeaders["x-login-verification"] = verification;
-  }
-
   return new NextResponse(body || null, {
     status: response.status,
-    headers: responseHeaders,
+    headers: relayHeaders(response),
   });
 }
 

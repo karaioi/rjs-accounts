@@ -44,7 +44,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { authClient } from "@/lib/auth/client";
-import { describeAuthError } from "@/lib/auth/errors";
+import { describeAuthError, TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 import { consents } from "@/lib/data/consents";
 import { type LoginValues, loginSchema } from "@/lib/validations/login";
 import { otpSchema } from "@/lib/validations/otp";
@@ -104,7 +104,13 @@ export function LoginForm() {
 
       // The password was accepted. Record the pending second step *before*
       // asking Managed Auth to deliver the code, so no data is reachable yet.
-      await fetch("/api/verification/start", { method: "POST" });
+      const startResponse = await fetch("/api/verification/start", {
+        method: "POST",
+      });
+      if (startResponse.status === 429) {
+        setError(TOO_MANY_ATTEMPTS);
+        return;
+      }
 
       const { error: otpError } = await authClient.emailOtp.sendVerificationOtp(
         {
@@ -152,7 +158,13 @@ export function LoginForm() {
         return;
       }
 
-      await fetch("/api/verification/complete", { method: "POST" });
+      const gate = await fetch("/api/verification/complete", {
+        method: "POST",
+      });
+      if (gate.status === 429) {
+        setError(TOO_MANY_ATTEMPTS);
+        return;
+      }
 
       // Password + OTP are done. Approval is the remaining gate: a `pending`
       // account keeps its session but goes to the waiting screen.

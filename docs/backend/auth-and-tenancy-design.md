@@ -457,7 +457,8 @@ Managed Auth has **no MFA/2FA** (it is on their roadmap; see [§17](#17-risks--l
 - The **gate lives in FastAPI**: a session that never completes the OTP step can authenticate but cannot read or write data.
 - The verification record is **per user** (the latest row wins) and expires with the session window. It is keyed on the user rather than the session because completing the OTP step makes Managed Auth issue a fresh token; `session_ref` is stored for traceability.
 - OTP-only sign-in (without the password step) remains available.
-- The gate also enforces **account approval**: a `pending`/`rejected`/`suspended` account that *has* passed the OTP step gets `403` with `X-Account-Status` until an administrator activates it. `/me` and `/auth/register` intentionally stay accessible so a pending user can see their own state.
+- The gate also enforces **account approval**: a `pending`/`rejected`/`suspended` account that *has* passed the OTP step gets `403` with `X-Account-Status` until an administrator activates it. `/me`, `/auth/register`, and `/auth/login/verification/*` use `get_principal` directly so a not-yet-approved user can still bootstrap and see their own state.
+- **The web app mirrors the gate in routing.** `apps/web/proxy.ts` calls a visitor signed in only when they hold a session *and* are not mid-OTP: `/login` and `/sign-up` redirect to `/dashboard` for anyone already signed in (sign out to get them back), while a half-finished sign-in keeps `/login` so it can type the code that is waiting. The check reads `GET /api/v1/auth/login/verification` through the same-origin `/api/verification` relay, and skips the lookup entirely when no session cookie is present. `/pending` is deliberately not redirected — an unapproved account belongs there.
 
 ### 13.3 Password reset
 
@@ -472,6 +473,51 @@ Managed Auth `requestPasswordReset` → emailed code/link → `resetPassword`. A
 5. Read `X-Organization-Id` → confirm an `active` `app.membership` for (`sub`, org).
 6. Load the role's permissions.
 7. Enforce the required permission before the operation.
+
+### 13.5 Rate limiting
+
+Managed Auth runs better-auth's own limiter, but Neon exposes **no way to
+configure it**, and its defaults are short and burst-shaped (3 requests / 10 s on
+`/sign-in*` and `/sign-up*`, 3 / 60 s on `/email-otp/send-verification-otp`).
+They also count *requests*, not *targets* — nothing in Neon stops one address
+from being flooded. The limits are therefore ours, and they live in two places,
+because the OTP is sent and checked by Managed Auth: the only chokepoint the app
+controls is the same-origin auth proxy.
+
+| Layer | Covers | Counter |
+|---|---|---|
+| **Web auth proxy** (`apps/web/lib/auth/rate-limit.ts`) | the Managed Auth calls the browser makes: `sign-in/email`, `sign-up/email`, `email-otp/send-verification-otp`, `sign-in/email-otp`, `email-otp/verify-email`, `email-otp/check-verification-otp` | in-process fixed window — **per server instance** |
+| **FastAPI** (`apps/api/src/api/services/rate_limit.py`) | the endpoints the API owns: `/auth/login/verification/start`, `/…/complete`, `/auth/register` | `app.rate_limit` — shared and durable |
+
+Two keys are used where it matters: the **client IP** (one source spraying many
+accounts) and the **email** from the request body (one inbox or account being
+hammered). The IP key trusts the platform's `X-Forwarded-For`; the email key does
+not depend on it and is the stronger of the two.
+
+| Route | Per IP | Per email |
+|---|---|---|
+| `sign-in/email` | 10 / 15 min | 5 / 15 min |
+| `sign-up/email` | 5 / hour | — |
+| `email-otp/send-verification-otp` | 20 / 15 min | 5 / 15 min |
+| `sign-in/email-otp` | 30 / 15 min | 10 / 15 min |
+| `email-otp/verify-email` | 30 / 15 min | 10 / 15 min |
+| `email-otp/check-verification-otp` | 30 / 15 min | 10 / 15 min |
+| FastAPI `/auth/login/verification/start` | — | 10 / 15 min (per **user**) |
+| FastAPI `/auth/login/verification/complete` | — | 20 / 15 min (per **user**) |
+| FastAPI `/auth/register` | — | 5 / hour (per **user**) |
+
+- Every hit is counted **before** the request is served, so blocked attempts keep
+  counting — which is what makes a limit hold against a brute-force loop.
+- A blocked request gets **`429`** with `Retry-After` and `X-RateLimit-*`; the
+  client shows the same "too many attempts" copy whether the limit was hit at
+  Managed Auth, at the proxy, or at FastAPI (the relays pass the headers through).
+- The FastAPI counters live in `app.rate_limit` — one row per `(bucket, subject)`,
+  recycled in place, written in their own transaction so a `429` can never roll
+  the increment back. The table is not under RLS: the limiter runs before (and
+  without) a tenant, and the counters hold no tenant data.
+- The web counters are **per server instance** — exact on one process, a multiple
+  of the limit when several run in parallel. Sharing them would need
+  infrastructure the app does not have; better-auth's own limiter is the backstop.
 
 ---
 
@@ -577,6 +623,12 @@ The login-verification gate (`otp_required`) and the account-approval gate apply
 5. **Branch isolation.** Each database branch has its own Auth URL *and its own users*. Development users are distinct from production users by design.
 6. **A second DB role** (`app_runtime`) must be created, with a separate connection secret. Runtime `DATABASE_URL` changes accordingly.
 7. **Email deliverability** from Gmail SMTP is lower than a dedicated provider; acceptable for now, revisit with Resend.
+8. **Rate limits are partly per-process.** The web auth proxy's counters (which
+   cover the Managed Auth OTP calls — see [§13.5](#135-rate-limiting)) live in
+   memory, so they are exact on one server instance and a multiple of the limit
+   when several run in parallel; the IP key also trusts the platform's
+   `X-Forwarded-For`. The email key is unaffected, and better-auth's own limiter
+   is the backstop. Sharing the counters (Redis) is the fix if the app scales out.
 
 ### Open questions
 
@@ -630,7 +682,7 @@ uv run seed-admin someone@example.com # grant platform admin
 | Same-origin relay → FastAPI | `apps/web/app/api/backend/[...path]/route.ts` |
 | Auth screens (login / sign-up / pending) | `apps/web/app/(login)/` |
 | Admin approval queue | `apps/web/app/(application)/admin/users/` |
-| Route protection | `apps/web/proxy.ts` (Next 16 middleware) |
+| Route protection + auth-page redirects | `apps/web/proxy.ts` (Next 16 middleware) |
 | Backend app | `apps/api/src/api/` |
 | Models / migrations | `apps/api/src/api/models/`, `apps/api/alembic/` |
 
@@ -645,4 +697,6 @@ uv run seed-admin someone@example.com # grant platform admin
 - Password reset round-trip on shared SMTP.
 - Authorization: a `viewer` calling a create endpoint directly is denied `403`; a request for another org's data is denied; a platform admin bypasses.
 - Gate: a session that has not completed the OTP step receives `403 otp_required` on data routes.
+- Routing: with a session, `/login` and `/sign-up` redirect to `/dashboard` and `/pending` stays reachable; mid-OTP (code pending, unexpired) `/login` stays reachable; after sign-out `/dashboard` redirects back to `/login` and the auth pages render again.
+- Rate limits: the sixth `POST /api/auth/sign-in/email` (or `email-otp/send-verification-otp`) for one email in 15 minutes returns `429` with `Retry-After`; the sixth `POST /api/v1/auth/register` for one user returns `429` with `X-RateLimit-*`, and the counter row in `app.rate_limit` survives the rejection (a blocked attempt still counts).
 - RLS: as `app_runtime` with no session variables set → **zero rows**; with the correct org → only that org's rows.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { apiFetch } from "@/lib/api/server";
+import { apiFetch, relayHeaders } from "@/lib/api/server";
 
 /** Mark the sign-in verified after the OTP was confirmed (step 2 of sign-in). */
 export async function POST() {
@@ -11,6 +11,6 @@ export async function POST() {
 
   return new NextResponse(body || null, {
     status: response.status,
-    headers: { "content-type": "application/json" },
+    headers: relayHeaders(response),
   });
 }

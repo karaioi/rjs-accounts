@@ -55,6 +55,10 @@ The 6-digit verification-code input, built on the shadcn `InputOTP` (grouped slo
 
 The dashboard's "Your access" card. Server component that takes the `GET /api/v1/me` payload (`MeResponse` from `lib/api/types.ts`) and renders what the API resolved: name/email, **platform role** (label + the raw `platform_role` slug in mono, so the claim can be checked against `neon_auth.user.role`), **account status**, **email verification**, and the caller's **organization memberships** (organization name, `role_slug` badge, status) — or an empty state when there are none. The "Review pending accounts" link renders only for `is_platform_admin`. All labels/tones come from `lib/data/roles.ts`.
 
+### `sign-out-button.tsx` — `<SignOutButton />`
+
+Outline `Button` that ends the session (`authClient.signOut()`) and returns to `/login`. Client component; shows "Signing out…" while the request is in flight. Rendered in the signed-in shell (`app/(application)/layout.tsx`) and on `/pending` — it is the **only** way back to `/login`, because the Proxy hides the sign-in/sign-up pages for as long as a session exists.
+
 ### `password-requirements.tsx` — `<PasswordRequirements />`
 
 Live password-strength checklist. Props: `value: string` (+ optional `className`). Renders each rule with a green checkmark (`CheckmarkCircle01Icon`) when satisfied and a muted circle otherwise:

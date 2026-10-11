@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { apiFetch } from "@/lib/api/server";
+import { apiFetch, relayHeaders } from "@/lib/api/server";
 
 /**
  * Relay the backend's two-step sign-in gate to the browser (same-origin).
@@ -14,7 +14,7 @@ async function relay(path: string, method: "GET" | "POST") {
 
   return new NextResponse(body || null, {
     status: response.status,
-    headers: { "content-type": "application/json" },
+    headers: relayHeaders(response),
   });
 }
 

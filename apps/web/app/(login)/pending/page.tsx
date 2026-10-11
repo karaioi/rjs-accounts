@@ -1,8 +1,8 @@
 import { Clock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import Link from "next/link";
 import { AuthShell } from "@/components/auth-shell";
 import { Reveal } from "@/components/motion/reveal";
+import { SignOutButton } from "@/components/sign-out-button";
 import {
   Card,
   CardContent,
@@ -40,12 +40,7 @@ export default function PendingApproval() {
                 to sign in once your account is approved.
               </p>
 
-              <Link
-                href="/login"
-                className="text-sm font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
-              >
-                Back to sign in
-              </Link>
+              <SignOutButton />
             </div>
           </CardContent>
         </Card>
