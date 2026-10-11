@@ -1,6 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  '@vgpu/adapter-node': true
+  webgpu: true
 overrides:
   '@humanfs/node@<0.16.8': ^0.16.8
   flatted@<3.4.0: ^3.4.0

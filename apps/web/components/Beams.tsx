@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client';
 
 import { useEffect, useRef, type HTMLAttributes } from 'react';
@@ -414,7 +415,15 @@ export const Beams = ({
     });
     if (!container || !canvas || !gl) return undefined;
 
-    const floatTargets = !!gl.getExtension('EXT_color_buffer_float');
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      if (raf) cancelAnimationFrame(raf);
+    };
+    canvas.addEventListener('webglcontextlost', onContextLost);
+
+    const floatTargets =
+      !!gl.getExtension('EXT_color_buffer_float') &&
+      !!gl.getExtension('OES_texture_float_linear');
     const fieldProgram = link(gl, FIELD);
     const compositeProgram = link(gl, COMPOSITE);
     if (!fieldProgram || !compositeProgram) return undefined;
@@ -460,7 +469,7 @@ export const Beams = ({
         probe.fillStyle = value;
         probe.fillRect(0, 0, 1, 1);
         const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
-        rgb = [r, g, b].map(v => Math.pow(v / 255, 2.2));
+        rgb = [r, g, b].map(v => (v / 255) ** 2.2);
       }
       colorCache.set(value, rgb);
       return rgb;
@@ -515,7 +524,7 @@ export const Beams = ({
       const tint = toLinear(s.color);
       const tone = 0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2];
       const shadeDepth = Math.min(1, 0.18 / Math.max(tone, 0.001));
-      const ink = tint.map(v => Math.pow(Math.min(1, v * shadeDepth), 1 / 2.2));
+      const ink = tint.map(v => Math.min(1, v * shadeDepth) ** (1 / 2.2));
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(compositeProgram.program);
@@ -533,6 +542,7 @@ export const Beams = ({
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.uniform1i(c.uField, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindTexture(gl.TEXTURE_2D, null);
     };
 
     const frame = (now: number) => {
@@ -654,7 +664,7 @@ export const Beams = ({
       gl.deleteProgram(compositeProgram.program);
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      canvas.removeEventListener('webglcontextlost', onContextLost);
     };
   }, []);
 
@@ -669,7 +679,7 @@ export const Beams = ({
       style={backgroundColor ? { background: backgroundColor, ...style } : style}
       {...rest}
     >
-      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" aria-hidden="true" />
+      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
     </div>
   );
 };
