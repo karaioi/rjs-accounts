@@ -1,7 +1,8 @@
 "use client";
 
+import { EyeIcon, EyeOffIcon, LoaderIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
-import { EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
 import { useState } from "react";
 import * as z from "zod";
 
@@ -32,8 +33,15 @@ const loginSchema = z.object({
   email: z.email("Enter a valid email address."),
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters.")
-    .max(64, "Password must be at most 64 characters."),
+    .min(12, "Password must be at least 12 characters.")
+    .max(64, "Password must be at most 64 characters.")
+    .regex(/[A-Z]/, "Password must include at least one uppercase letter.")
+    .regex(/[a-z]/, "Password must include at least one lowercase letter.")
+    .regex(/[0-9]/, "Password must include at least one number.")
+    .regex(
+      /[^A-Za-z0-9]/,
+      "Password must include at least one special character.",
+    ),
 });
 
 export function LoginForm() {
@@ -139,7 +147,19 @@ export function LoginForm() {
                             showPassword ? "Hide password" : "Show password"
                           }
                         >
-                          {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                          {showPassword ? (
+                            <HugeiconsIcon
+                              icon={EyeOffIcon}
+                              size={16}
+                              strokeWidth={1.5}
+                            />
+                          ) : (
+                            <HugeiconsIcon
+                              icon={EyeIcon}
+                              size={16}
+                              strokeWidth={1.5}
+                            />
+                          )}
                         </InputGroupButton>
                       </InputGroupAddon>
                     </InputGroup>
@@ -159,10 +179,17 @@ export function LoginForm() {
             <Button
               type="submit"
               form="login-form"
-              className="w-full bg-[#569D3C] h-12 rounded-3xl"
+              className="w-full"
               disabled={isSubmitting}
             >
-              {isSubmitting && <Loader2Icon className="animate-spin" />}
+              {isSubmitting && (
+                <HugeiconsIcon
+                  icon={LoaderIcon}
+                  size={16}
+                  strokeWidth={1.5}
+                  className="animate-spin"
+                />
+              )}
               {isSubmitting ? "Signing in..." : "Sign in"}
             </Button>
           )}
