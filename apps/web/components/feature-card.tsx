@@ -30,7 +30,7 @@ export function FeatureCard({ feature, className }: FeatureCardProps) {
       }}
       transition={SPRING_SOFT}
       className={cn(
-        "flex flex-col items-center gap-2 rounded-3xl bg-white/10 p-4 backdrop-blur-sm ring-1 ring-white/10 transition-colors hover:bg-white/15 hover:ring-white/20",
+        "flex flex-col h-40 items-center gap-2 rounded-3xl bg-white/10 p-4 backdrop-blur-sm ring-1 ring-white/10 transition-colors hover:bg-white/15 hover:ring-white/20",
         className,
       )}
     >

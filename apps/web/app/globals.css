@@ -131,3 +131,9 @@
     @apply font-sans;
   }
 }
+
+
+::selection{
+  background-color: var(--color-brand-blue);
+  color: white;
+}
