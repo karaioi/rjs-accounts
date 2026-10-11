@@ -1,7 +1,7 @@
 // @ts-nocheck
-'use client';
+"use client";
 
-import { useEffect, useRef, type HTMLAttributes } from 'react';
+import { type HTMLAttributes, useEffect, useRef } from "react";
 
 export interface BeamsProps extends HTMLAttributes<HTMLDivElement> {
   color?: string;
@@ -55,7 +55,10 @@ type Settings = {
   dpr?: number;
 };
 
-type Program = { program: WebGLProgram; uniforms: Record<string, WebGLUniformLocation | null> };
+type Program = {
+  program: WebGLProgram;
+  uniforms: Record<string, WebGLUniformLocation | null>;
+};
 
 const QUAD_VERTEX = `#version 300 es
 in vec2 aPosition;
@@ -308,7 +311,8 @@ void main() {
 const INTRO_SECONDS = 1.6;
 const MAX_FIELD_PIXELS = 1600000;
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
 
 const compile = (gl: WebGL2RenderingContext, type: number, source: string) => {
   const shader = gl.createShader(type);
@@ -320,14 +324,17 @@ const compile = (gl: WebGL2RenderingContext, type: number, source: string) => {
   return null;
 };
 
-const link = (gl: WebGL2RenderingContext, fragmentSource: string): Program | null => {
+const link = (
+  gl: WebGL2RenderingContext,
+  fragmentSource: string,
+): Program | null => {
   const vertex = compile(gl, gl.VERTEX_SHADER, QUAD_VERTEX);
   const fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentSource);
   const program = gl.createProgram();
   if (!vertex || !fragment || !program) return null;
   gl.attachShader(program, vertex);
   gl.attachShader(program, fragment);
-  gl.bindAttribLocation(program, 0, 'aPosition');
+  gl.bindAttribLocation(program, 0, "aPosition");
   gl.linkProgram(program);
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
@@ -345,7 +352,7 @@ const link = (gl: WebGL2RenderingContext, fragmentSource: string): Program | nul
 };
 
 export const Beams = ({
-  color = '#ffffff',
+  color = "#ffffff",
   beamWidth = 140,
   rotation = 30,
   speed = 1,
@@ -368,7 +375,7 @@ export const Beams = ({
   backgroundColor,
   paused = false,
   dpr,
-  className = '',
+  className = "",
   style,
   ...rest
 }: BeamsProps) => {
@@ -397,7 +404,7 @@ export const Beams = ({
     opacity: clamp(opacity, 0, 1),
     lightMode,
     paused,
-    dpr
+    dpr,
   };
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -405,13 +412,13 @@ export const Beams = ({
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
-    const gl = canvas?.getContext('webgl2', {
+    const gl = canvas?.getContext("webgl2", {
       alpha: true,
       premultipliedAlpha: true,
       antialias: false,
       depth: false,
       stencil: false,
-      powerPreference: 'high-performance'
+      powerPreference: "high-performance",
     });
     if (!container || !canvas || !gl) return undefined;
 
@@ -419,11 +426,11 @@ export const Beams = ({
       e.preventDefault();
       if (raf) cancelAnimationFrame(raf);
     };
-    canvas.addEventListener('webglcontextlost', onContextLost);
+    canvas.addEventListener("webglcontextlost", onContextLost);
 
     const floatTargets =
-      !!gl.getExtension('EXT_color_buffer_float') &&
-      !!gl.getExtension('OES_texture_float_linear');
+      !!gl.getExtension("EXT_color_buffer_float") &&
+      !!gl.getExtension("OES_texture_float_linear");
     const fieldProgram = link(gl, FIELD);
     const compositeProgram = link(gl, COMPOSITE);
     if (!fieldProgram || !compositeProgram) return undefined;
@@ -432,7 +439,11 @@ export const Beams = ({
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 3, -1, -1, 3]),
+      gl.STATIC_DRAW,
+    );
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
@@ -447,17 +458,36 @@ export const Beams = ({
       texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
       const levels = Math.floor(Math.log2(Math.max(width, height))) + 1;
-      gl.texStorage2D(gl.TEXTURE_2D, levels, floatTargets ? gl.RGBA16F : gl.RGBA8, width, height);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texStorage2D(
+        gl.TEXTURE_2D,
+        levels,
+        floatTargets ? gl.RGBA16F : gl.RGBA8,
+        width,
+        height,
+      );
+      gl.texParameteri(
+        gl.TEXTURE_2D,
+        gl.TEXTURE_MIN_FILTER,
+        gl.LINEAR_MIPMAP_LINEAR,
+      );
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        texture,
+        0,
+      );
     };
 
-    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const probe = document
+      .createElement("canvas")
+      .getContext("2d", { willReadFrequently: true });
+    const reduce =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const colorCache = new Map<string, number[]>();
     const toLinear = (value: string): number[] => {
       const cached = colorCache.get(value);
@@ -465,11 +495,11 @@ export const Beams = ({
       let rgb = [1, 1, 1];
       if (probe) {
         probe.clearRect(0, 0, 1, 1);
-        probe.fillStyle = '#ffffff';
+        probe.fillStyle = "#ffffff";
         probe.fillStyle = value;
         probe.fillRect(0, 0, 1, 1);
         const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
-        rgb = [r, g, b].map(v => (v / 255) ** 2.2);
+        rgb = [r, g, b].map((v) => (v / 255) ** 2.2);
       }
       colorCache.set(value, rgb);
       return rgb;
@@ -483,7 +513,7 @@ export const Beams = ({
       reach: 0,
       x: 0,
       y: 0,
-      lightY: 0
+      lightY: 0,
     };
     let raf = 0;
     let last = 0;
@@ -491,7 +521,11 @@ export const Beams = ({
 
     const render = () => {
       const s = settingsRef.current;
-      const presence = state.intro * state.intro * state.intro * (state.intro * (state.intro * 6 - 15) + 10);
+      const presence =
+        state.intro *
+        state.intro *
+        state.intro *
+        (state.intro * (state.intro * 6 - 15) + 10);
       gl.bindVertexArray(vao);
       sizeTarget(view.fieldWidth, view.fieldHeight);
 
@@ -503,7 +537,11 @@ export const Beams = ({
       gl.viewport(0, 0, target.width, target.height);
       gl.useProgram(fieldProgram.program);
       gl.uniform2f(f.uView, view.width, view.height);
-      gl.uniform2f(f.uScale, view.width / target.width, view.height / target.height);
+      gl.uniform2f(
+        f.uScale,
+        view.width / target.width,
+        view.height / target.height,
+      );
       gl.uniform2f(f.uTurn, Math.cos(angle), Math.sin(angle));
       gl.uniform1f(f.uTime, (state.clock * 0.12) % 289);
       gl.uniform1f(f.uWidth, s.beamWidth);
@@ -515,7 +553,13 @@ export const Beams = ({
       gl.uniform1f(f.uFill, s.fillLight);
       gl.uniform3f(f.uLight, 0, 3 + sweep + state.lightY * reach, 10);
       gl.uniform1f(f.uCamera, view.height * 1.866);
-      gl.uniform4f(f.uPointer, state.x, view.height - state.y, reach, Math.max(view.height, view.width) * 0.28);
+      gl.uniform4f(
+        f.uPointer,
+        state.x,
+        view.height - state.y,
+        reach,
+        Math.max(view.height, view.width) * 0.28,
+      );
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.generateMipmap(gl.TEXTURE_2D);
@@ -524,7 +568,7 @@ export const Beams = ({
       const tint = toLinear(s.color);
       const tone = 0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2];
       const shadeDepth = Math.min(1, 0.18 / Math.max(tone, 0.001));
-      const ink = tint.map(v => Math.min(1, v * shadeDepth) ** (1 / 2.2));
+      const ink = tint.map((v) => Math.min(1, v * shadeDepth) ** (1 / 2.2));
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(compositeProgram.program);
@@ -554,7 +598,8 @@ export const Beams = ({
       const moving = !s.paused && !reduce;
       if (moving) state.clock += dt * s.speed;
       if (!s.intro || reduce) state.intro = 1;
-      else if (state.intro < 1) state.intro = Math.min(1, state.intro + dt / INTRO_SECONDS);
+      else if (state.intro < 1)
+        state.intro = Math.min(1, state.intro + dt / INTRO_SECONDS);
 
       const engaged = s.mouseInteraction && pointer.inside && !reduce;
       if (engaged && state.reach < 0.01) {
@@ -564,7 +609,9 @@ export const Beams = ({
       const follow = 1 - Math.exp(-dt * 7);
       state.x += (pointer.x - state.x) * follow;
       state.y += (pointer.y - state.y) * follow;
-      state.reach += ((engaged ? 1 : 0) - state.reach) * (1 - Math.exp(-dt * (engaged ? 3.2 : 1.8)));
+      state.reach +=
+        ((engaged ? 1 : 0) - state.reach) *
+        (1 - Math.exp(-dt * (engaged ? 3.2 : 1.8)));
       const turn = (s.rotation * Math.PI) / 180;
       const offsetX = state.x - view.width / 2;
       const offsetY = view.height / 2 - state.y;
@@ -581,7 +628,8 @@ export const Beams = ({
     };
 
     const wake = () => {
-      if (!raf && visible && !document.hidden) raf = requestAnimationFrame(frame);
+      if (!raf && visible && !document.hidden)
+        raf = requestAnimationFrame(frame);
     };
 
     const resize = () => {
@@ -607,7 +655,11 @@ export const Beams = ({
       const rect = container.getBoundingClientRect();
       pointer.x = event.clientX - rect.left;
       pointer.y = event.clientY - rect.top;
-      pointer.inside = pointer.x >= 0 && pointer.y >= 0 && pointer.x <= rect.width && pointer.y <= rect.height;
+      pointer.inside =
+        pointer.x >= 0 &&
+        pointer.y >= 0 &&
+        pointer.x <= rect.width &&
+        pointer.y <= rect.height;
       wake();
     };
 
@@ -623,17 +675,17 @@ export const Beams = ({
 
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
-    const intersection = new IntersectionObserver(entries => {
-      visible = entries.some(entry => entry.isIntersecting);
+    const intersection = new IntersectionObserver((entries) => {
+      visible = entries.some((entry) => entry.isIntersecting);
       if (visible) {
         last = 0;
         wake();
       }
     });
     intersection.observe(container);
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    document.documentElement.addEventListener('pointerleave', onPointerLeave);
-    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onPointerLeave);
+    document.addEventListener("visibilitychange", onVisibility);
     resize();
 
     let lastQuality = settingsRef.current.quality;
@@ -655,16 +707,19 @@ export const Beams = ({
       wakeRef.current = null;
       resizeObserver.disconnect();
       intersection.disconnect();
-      window.removeEventListener('pointermove', onPointerMove);
-      document.documentElement.removeEventListener('pointerleave', onPointerLeave);
-      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener("pointermove", onPointerMove);
+      document.documentElement.removeEventListener(
+        "pointerleave",
+        onPointerLeave,
+      );
+      document.removeEventListener("visibilitychange", onVisibility);
       if (texture) gl.deleteTexture(texture);
       gl.deleteFramebuffer(framebuffer);
       gl.deleteProgram(fieldProgram.program);
       gl.deleteProgram(compositeProgram.program);
       gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);
-      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener("webglcontextlost", onContextLost);
     };
   }, []);
 
@@ -675,11 +730,18 @@ export const Beams = ({
   return (
     <div
       ref={containerRef}
-      className={['relative h-full w-full overflow-hidden', className].filter(Boolean).join(' ')}
-      style={backgroundColor ? { background: backgroundColor, ...style } : style}
+      className={["relative h-full w-full overflow-hidden", className]
+        .filter(Boolean)
+        .join(" ")}
+      style={
+        backgroundColor ? { background: backgroundColor, ...style } : style
+      }
       {...rest}
     >
-      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 block h-full w-full"
+      />
     </div>
   );
 };

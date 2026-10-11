@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Beams from "@/components/Beams";
+import { LoginForm } from "./login-form";
 
 export default function Login() {
   return (
-    <div className="h-screen w-screen flex justify-between items-center p-4 gap-4">
+    <div className="h-screen w-screen flex justify-between items-center p-2 gap-4">
       <div className="w-2/3 h-full relative overflow-hidden bg-black text-white rounded-3xl">
         <Beams
           color="#2A8DC6"
@@ -30,14 +31,16 @@ export default function Login() {
         <div className="absolute top-1/2 left-1/2 transform -translate-1/2"></div>
       </div>
 
-      <div className="w-1/3 h-full relative overflow-hidden rounded-3xl border border-black p-4">
+      <div className="w-1/3 h-full relative overflow-hidden flex flex-col justify-center items-center">
         <Image
           src={"/login-logo.png"}
           width={4501}
           height={1227}
           alt="rjs-accounts-logo"
-          className="w-64 object-contain mx-auto"
+          className="w-42 mb-8 object-contain"
         />
+
+        <LoginForm />
       </div>
     </div>
   );
