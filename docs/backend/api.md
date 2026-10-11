@@ -114,15 +114,15 @@ this app renders and sends the mail through `mailer.py`, so it leaves from
 
 The API runs as part of the monorepo dev stack — from the repo root, `pnpm dev`
 starts web (`:3000`) **and** this API (`:8000`) together via turbo
-(`apps/api/package.json` runs `uv run uvicorn api.main:app --reload`). To run it
-in isolation:
+`apps/api/package.json` runs `uv run api`, which reads `HOST`/`PORT` from `.env`).
+To run it in isolation:
 
 ```sh
 cd apps/api
 cp .env.example .env            # then fill in the Neon values
 uv sync
 uv run alembic upgrade head     # creates/populates the `app` schema
-uv run uvicorn api.main:app --reload
+uv run api
 ```
 
 - Interactive docs: <http://127.0.0.1:8000/docs>.

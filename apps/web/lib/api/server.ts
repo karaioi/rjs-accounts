@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth/server";
+import { requireEnv } from "@/lib/env";
 
-const API_BASE_URL = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
+const API_BASE_URL = requireEnv("API_BASE_URL");
 
 /**
  * Backend headers the browser cares about, passed through by the relays:

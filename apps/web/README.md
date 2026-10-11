@@ -23,12 +23,11 @@ Open <http://localhost:3000>. To run just this app:
 
 ## Environment
 
-Copy `.env.example` to `.env.local` and fill it in (`neon env pull` writes the
-Auth values):
+Copy `.env.example` to `.env.local` and fill it in (`NEON_AUTH_BASE_URL` comes
+from `neon neon-auth status`):
 
 ```sh
 NEON_AUTH_BASE_URL=        # Neon Auth origin
-NEON_AUTH_JWKS_URL=        # JWKS endpoint for JWT verification
 NEON_AUTH_COOKIE_SECRET=   # openssl rand -base64 32
 API_BASE_URL=http://127.0.0.1:8000   # server-side only
 ```

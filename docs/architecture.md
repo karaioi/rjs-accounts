@@ -69,11 +69,10 @@ lib/
 `pnpm dev` (root) runs every workspace's `dev` task via turbo:
 
 - `apps/web` → **port 3000** (`next dev`)
-- `apps/api` → **port 8000** (`uv run uvicorn api.main:app --reload`)
+- `apps/api` → **port 8000** (`uv run api`, host/port from `HOST`/`PORT` in `.env`)
 
 The API must not be started separately while `pnpm dev` is running — the second
-listener fails with `EADDRINUSE`. To run only the API: `cd apps/api && uv run
-uvicorn api.main:app --reload`.
+listener fails with `EADDRINUSE`. To run only the API: `cd apps/api && uv run api`.
 
 ## Neon configuration
 

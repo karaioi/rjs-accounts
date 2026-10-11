@@ -19,7 +19,7 @@ uv run alembic upgrade head
 Run the API:
 
 ```sh
-uv run uvicorn api.main:app --reload          # from apps/api
+uv run api                                    # from apps/api
 pnpm dev                                      # or: from the repo root, starts
                                               #     web (:3000) + api (:8000) together
 ```

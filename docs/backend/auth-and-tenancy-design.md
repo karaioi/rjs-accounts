@@ -546,8 +546,8 @@ Consequences worth knowing:
 - Setting the **application name** in the Neon Auth config (`update_auth_config`) still matters for anything Neon itself sends (e.g. organization invitations).
 - Everything is **per branch**: enabling the webhook on a dev branch leaves production on Neon's sender until it is enabled there too.
 - Managed Auth's shared SMTP (`auth@mail.myneon.app`) remains the zero-config fallback while a branch has no webhook.
-- Because the project currently has a **normal Gmail account, not a business domain**, we use free options: `onboarding@resend.dev` (Resend's test sender, which may only send to the account owner's address) until a domain is verified.
-- Resend needs a **verified sending domain**; switching providers stays an env change, not a code change.
+- Because the project currently has a **normal Gmail account, not a business domain**, the mailer sends through **Gmail SMTP** (`MAIL_PROVIDER=smtp`, `smtp.gmail.com:587`) authenticated as `team.rjsconsultancy@gmail.com` with a Google **app password** (`SMTP_PASSWORD`). Resend cannot send *from* a `gmail.com` address — it rejects unverified domains with `403`.
+- Resend (or any provider) needs a **verified sending domain** for delivery to arbitrary recipients; switching transports stays an env change, not a code change.
 
 ### 14.2 Registering the webhook
 
@@ -558,12 +558,20 @@ The webhook lives on the FastAPI service and needs a **public HTTPS URL** — in
 #   URL:    https://<public-host>/api/v1/auth/webhooks/neon
 #   Events: send.otp, send.magic_link
 
-# …or with the Neon CLI:
+# …or with the Neon CLI (--enabled is required; --url must be the full path):
+neon neon-auth config webhook get
 neon neon-auth config webhook update \
-  --project-id <project> --branch-id <branch> \
+  --project-id fancy-union-18717305 --branch production \
+  --enabled \
   --url https://<public-host>/api/v1/auth/webhooks/neon \
-  --events send.otp,send.magic_link
+  --enabled-events send.otp send.magic_link
 ```
+
+**Current state (Oct 2026).** The `production` branch has the webhook **enabled** for `send.otp` + `send.magic_link`, pointing at a Cloudflare **quick tunnel** to the local API (`cloudflared tunnel --url http://localhost:8000` → an ephemeral `https://<name>.trycloudflare.com`).
+
+- The tunnel URL exists only while that process runs and **changes on every restart**, so re-run `webhook update --url …` after restarting the tunnel. Read the live value any time with `neon neon-auth config webhook get`.
+- If the tunnel is down, Neon's webhook delivery fails and the code is not sent (Neon retries); the branch falls back to nothing until the URL is restored.
+- Verified end-to-end: a sign-in OTP arrived rendered by `emails.py` with Resend `last_event: delivered` (Resend was the transport then). The mailer is now configured for **Gmail SMTP**, sending from `RJS Accounts <team.rjsconsultancy@gmail.com>`; it needs a Google **app password** in `SMTP_PASSWORD` before that transport can authenticate.
 
 There is no MCP tool for webhooks or the email provider — use the Console, the CLI, or the Neon REST API.
 
@@ -646,9 +654,11 @@ The login-verification gate (`otp_required`) and the account-approval gate apply
 
 ### Environment
 
-`apps/web/.env.local` (see `.env.example`) — the `NEON_AUTH_BASE_URL`, `NEON_AUTH_JWKS_URL`, and `NEON_AUTH_COOKIE_SECRET` values, plus `API_BASE_URL` (the FastAPI origin, used **server-side only** in the route handlers/relay, so no `NEXT_PUBLIC_` prefix). Generate the cookie secret with `openssl rand -base64 32`. The web app holds **auth values + the API base URL only** — never DB or storage credentials (those belong to `apps/api`).
+`apps/web/.env.local` (see `.env.example`) — the `NEON_AUTH_BASE_URL` and `NEON_AUTH_COOKIE_SECRET` values, plus `API_BASE_URL` (the FastAPI origin, used **server-side only** in the route handlers/relay, so no `NEXT_PUBLIC_` prefix). Generate the cookie secret with `openssl rand -base64 32`. The web app holds **auth values + the API base URL only** — never DB or storage credentials (those belong to `apps/api`).
 
-`apps/api/.env` — `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (direct, migrations), `NEON_AUTH_JWKS_URL`, `NEON_AUTH_BASE_URL`, `ENVIRONMENT`, `CORS_ORIGINS` (must include the web origin, e.g. `["http://localhost:3000"]`), `APP_NAME` (branding in emails), and the mailer settings (`MAIL_PROVIDER`, `RESEND_API_KEY`, `MAIL_FROM`, `SMTP_*`). The mailer is production-critical now that it delivers the sign-in OTP ([§14.1](#141-otp-delivery-runs-through-our-mailer-neon-auth-webhooks)), so `RESEND_API_KEY` + `MAIL_FROM` (or `SMTP_*`) must be set wherever the webhook is registered. Until the `app_runtime` role exists ([§17](#17-risks--limitations) risk 6) both URLs use the owner role: RLS is in place but bypassed by the owner, so **the API layer is what enforces tenancy today**.
+`apps/api/.env` — `HOST` and `PORT` (the local dev bind address), `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (direct, migrations), `NEON_AUTH_JWKS_URL`, `NEON_AUTH_BASE_URL`, `ENVIRONMENT`, `CORS_ORIGINS` (must include the web origin, e.g. `["http://localhost:3000"]`), `APP_NAME` (branding in emails), and the mailer settings (`MAIL_PROVIDER`, `MAIL_FROM`, plus the transport credentials — `SMTP_*` for Gmail/Resend SMTP, or `RESEND_API_KEY` for the Resend HTTP API). The mailer is production-critical now that it delivers the sign-in OTP ([§14.1](#141-otp-delivery-runs-through-our-mailer-neon-auth-webhooks)), so a transport and `MAIL_FROM` must be set wherever the webhook is registered. Until the `app_runtime` role exists ([§17](#17-risks--limitations) risk 6) both URLs use the owner role: RLS is in place but bypassed by the owner, so **the API layer is what enforces tenancy today**.
+
+Neither app has in-code defaults for these values: every required variable must be set (the API pulls the branch database + Auth values with `neon env pull --service postgres,auth --file apps/api/.env`), and a missing one fails fast at startup.
 
 ### Common commands
 
@@ -659,7 +669,7 @@ pnpm --filter web check-types        # web types
 pnpm --filter web build              # web build
 
 cd apps/api
-uv run uvicorn api.main:app --reload # backend alone (already started by pnpm dev)
+uv run api                           # backend alone (host/port from .env)
 uv run alembic upgrade head          # apply migrations
 uv run alembic revision --autogenerate -m "message"
 uv run seed-admin someone@example.com # grant platform admin

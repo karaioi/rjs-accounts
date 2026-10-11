@@ -21,6 +21,9 @@ from .config import Settings, get_settings
 
 logger = logging.getLogger("api.mailer")
 
+# Resend's fixed HTTP API endpoint. A provider constant, not environment config.
+RESEND_API_URL = "https://api.resend.com/emails"
+
 
 def send_email(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
     """Send an email, or log it when no transport is configured.
@@ -88,7 +91,7 @@ def _send_resend(
         payload["html"] = html
 
     response = httpx.post(
-        settings.resend_api_url,
+        RESEND_API_URL,
         headers={"Authorization": f"Bearer {settings.resend_api_key}"},
         json=payload,
         timeout=15,

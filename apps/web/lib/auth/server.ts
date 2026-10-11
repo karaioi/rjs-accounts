@@ -1,5 +1,7 @@
 import { createNeonAuth } from "@neondatabase/auth/next/server";
 
+import { requireEnv } from "@/lib/env";
+
 /**
  * Server-side Neon Auth instance (Managed Better Auth).
  *
@@ -7,8 +9,8 @@ import { createNeonAuth } from "@neondatabase/auth/next/server";
  * that needs the session or a bearer token for the FastAPI backend.
  */
 export const auth = createNeonAuth({
-  baseUrl: process.env.NEON_AUTH_BASE_URL as string,
+  baseUrl: requireEnv("NEON_AUTH_BASE_URL"),
   cookies: {
-    secret: process.env.NEON_AUTH_COOKIE_SECRET as string,
+    secret: requireEnv("NEON_AUTH_COOKIE_SECRET"),
   },
 });

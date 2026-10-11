@@ -23,6 +23,7 @@ Read the docs in [`docs/`](docs/README.md) before working on the project — the
 - **docs/backend/api.md** — FastAPI app: endpoint surface, access rules (gates/RBAC), local dev
 - **docs/backend/auth-and-tenancy-design.md** — auth + multi-tenant design: Managed Better Auth for identity, `app` schema for RBAC/tenancy (`customer → organization → membership → role`), two-step sign-in (password → email OTP), RLS. Read before touching auth/tenancy.
 - **docs/backend/database-schema-design.md** — PostgreSQL schema design guidelines (follow before any database schema work)
+- **docs/backend/fastapi-standards.md** — FastAPI engineering standards (structure, validation, DI, security, testing, Definition of Done) — follow when generating, reviewing, or modifying `apps/api` code
 
 ## Quick context
 

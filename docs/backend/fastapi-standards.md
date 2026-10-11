@@ -82,63 +82,114 @@ For a small application, a simpler structure is acceptable. Do not add a reposit
 - Do not rely on client-side validation alone.
 - Do not expose database-only fields, password hashes, internal flags, or private information in response models.
 - Use optional fields carefully and distinguish between “not provided” and an explicit `null` where the update semantics require it.
-- Validate business rules in the service layer as well as input shape at the HTTP layer.
-- Do not rely on client-side validation alone.
+- Validate business rules in the service layer as well as validating input shape at the API boundary.
+- Use Pydantic settings for application configuration where appropriate.
 
 ## 5. Dependency Injection
 
-- Use FastAPI `Depends` for shared dependencies such as database sessions, the current user, and settings.
-- Keep dependencies small and explicit; prefer returning the value the endpoint needs.
-- Avoid hidden global state; pass what is needed through dependencies.
+Use FastAPI's `Depends()` for shared dependencies, such as:
+- Database sessions.
+- The current authenticated user.
+- Authorization and permission checks.
+- Service objects.
+- Request-scoped resources.
 
-## 6. Database and ORM
+Use `yield` dependencies when resources require cleanup. Define transaction ownership clearly: avoid accidentally committing transactions in multiple layers or leaving failed transactions open.
 
-- Use SQLAlchemy 2.x style with typed models.
-- Keep migration changes in Alembic; never edit the database by hand in a way that is not reproducible from migrations.
-- Use `app` schema for application-owned tables.
-- Wrap multi-step writes in transactions and roll back on error.
-- Do not expose ORM objects directly; map to Pydantic response schemas.
+## 6. Business Logic and Database Access
 
-## 7. Authentication and Authorization
+- Keep routes thin and business logic in services.
+- Keep database access in a clearly defined place. A repository layer is optional, not mandatory.
+- Use an ORM or parameterized queries; never build SQL by concatenating untrusted input.
+- Use transactions for operations that must succeed or fail together.
+- Use database constraints and indexes to enforce important invariants and support expected query patterns.
+- Avoid N+1 query problems and loading more data than needed.
+- Use migrations (for example, Alembic) for schema changes in shared and production environments. Do not rely on manual production schema edits.
+- Manage database sessions with dependencies or another explicit lifecycle mechanism.
+- Do not perform slow external network calls while holding a database transaction open unless necessary.
+- Do not use a synchronous database driver directly in an `async def` route if it blocks the event loop. Choose a consistent sync or async database approach.
+- Use connection pooling and sensible timeouts for production workloads.
+- Handle concurrent updates and race conditions where the business domain requires it.
 
-- Verify tokens server side; never trust claims that are not verified.
-- Enforce authorization on the server for every protected endpoint.
-- Use a single, well-documented principal/tenant context passed through dependencies.
-- Deny by default; grant access explicitly.
+## 7. Async and Concurrency
+
+- Use `async def` when the request path calls asynchronous I/O libraries.
+- Use regular `def` for blocking/synchronous operations that FastAPI can run in its thread pool.
+- Do not call blocking I/O or CPU-heavy work directly inside an `async def` handler.
+- Use async-compatible HTTP clients and database drivers when using asynchronous flows.
+- Offload substantial CPU-bound tasks to an appropriate worker/process system rather than assuming `async` makes them faster.
+- Set timeouts and handle cancellation for external service calls.
+- Do not create background tasks for critical work that must survive process restarts; use a durable job queue when appropriate.
 
 ## 8. Error Handling
 
-- Return consistent JSON error bodies.
-- Use appropriate HTTP status codes.
-- Do not leak stack traces or internal messages to clients.
-- Log server-side errors with enough context to debug, without logging secrets.
+- Use `HTTPException` for expected HTTP errors and choose accurate status codes.
+- Use centralized exception handlers for application-wide error formats when consistency is needed.
+- Return safe, actionable error messages without exposing stack traces, secrets, SQL statements, or internal implementation details.
+- Use `400` for malformed or invalid requests when appropriate, `401` for missing/invalid authentication, `403` for insufficient permission, `404` for missing resources, `409` for conflicts, and `422` for request validation errors as appropriate to the API contract.
+- Do not catch and silently ignore broad exceptions.
+- Log unexpected exceptions with a correlation/request ID where possible, and return a generic `500` response to clients.
+- Ensure errors do not reveal whether sensitive accounts or records exist when that would create a security risk.
 
-## 9. Security
+## 9. Security Requirements
 
-- Never commit secrets; use environment variables and keep `.env` files out of version control.
-- Hash passwords with a modern algorithm; never store plaintext.
-- Keep dependencies patched; avoid unnecessary dependencies.
-- Validate and bound all external input.
-- Apply rate limits to unauthenticated and abuse-prone endpoints.
+- Authenticate protected endpoints and perform authorization checks for every protected resource/action.
+- Enforce object-level authorization: a user must not access or modify another user's resource merely by changing an ID.
+- Follow least privilege for users, database accounts, service accounts, and API tokens.
+- Store secrets in environment variables or a managed secret store; never commit real secrets.
+- Provide `.env.example` with placeholder values only. Ensure `.env` and secret files are excluded from version control.
+- Use HTTPS in production.
+- Configure CORS for known trusted origins only; do not use permissive wildcard settings with credentials.
+- Validate all external input and enforce reasonable body, upload, pagination, and query limits.
+- Use parameterized SQL or a safe ORM.
+- Apply rate limiting to sensitive or abuse-prone endpoints when appropriate.
+- Use secure password hashing via a maintained password-hashing library; never store plaintext passwords.
+- Use established authentication standards and maintained libraries rather than designing custom cryptography or token schemes.
+- Validate token signature, issuer, audience, expiration, and relevant claims when applicable.
+- Do not put secrets or sensitive personal data in URLs.
+- Avoid logging passwords, authorization headers, access tokens, session cookies, or unnecessary personal data.
+- Keep dependencies patched and scan for known vulnerabilities.
+- Set trusted-host/proxy configuration correctly when deployed behind a reverse proxy.
+- Review file uploads, redirects, SSRF risks, and external URL fetching if those features exist.
+- Apply CSRF protections when using cookie-based authentication in browser contexts where CSRF is relevant.
+- Use security headers at the application or reverse-proxy layer as appropriate.
+- Follow the OWASP API Security Top 10 as a security review reference.
 
-## 10. Configuration
+## 10. Configuration and Environments
 
-- Load configuration from the environment into a typed settings object.
-- Provide `.env.example` with all required keys and safe placeholder values.
-- Fail fast at startup on missing or invalid required configuration.
-- Do not commit real credentials.
+- Keep development, test, and production configuration separate.
+- Load configuration from environment variables or a settings system.
+- Fail fast when required configuration is missing or invalid.
+- Never hardcode credentials, production URLs, or environment-specific secrets in source code.
+- Use safe production defaults; enable verbose debugging only in development.
+- Document required configuration variables and provide placeholder examples.
+- Do not print secrets as part of startup diagnostics.
 
-## 11. Logging
+## 11. Logging and Observability
 
-- Use structured, level-appropriate logging.
-- Include request correlation identifiers where helpful.
-- Never log secrets, tokens, or full personal data.
+- Use Python's `logging` module or a structured logging solution.
+- Include useful context such as request/correlation ID, route, duration, and outcome without exposing sensitive data.
+- Prefer structured logs in production systems when supported by the deployment platform.
+- Track request latency, error rates, throughput, and dependency/database health.
+- Add health endpoints intentionally: distinguish process liveness from dependency readiness when useful.
+- Use metrics and tracing for systems where production debugging requires them.
+- Avoid logging the same exception repeatedly at multiple layers without adding value.
 
-## 12. Testing
+## 12. Testing Standards
 
-- Add automated tests for behaviour you change, including failure paths.
-- Prefer deterministic tests with isolated fixtures.
-- Do not call external network services in tests.
+Use `pytest` and FastAPI's `TestClient` or HTTPX, as appropriate.
+
+- Write unit tests for business rules.
+- Write integration tests for API routes and database behavior.
+- Test successful cases, validation failures, authorization failures, missing resources, and conflict cases.
+- Test that response models do not leak private fields.
+- Use dependency overrides or fixtures to isolate tests from real external services.
+- Use a dedicated test database or isolated test transactions; never run destructive tests against production data.
+- Test database migrations and important transaction behavior.
+- Make tests deterministic and independent of execution order.
+- Add regression tests for bugs.
+- Mock external services at appropriate boundaries, but do not mock away the behavior an integration test is intended to verify.
+- Include coverage reporting if useful, but do not optimize only for a coverage percentage.
 
 ## 13. Code Quality and Type Checking
 

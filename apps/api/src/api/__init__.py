@@ -8,7 +8,14 @@ __all__ = ["__version__", "main"]
 
 
 def main() -> None:
-    """Entry point for the `api` console script (local dev server)."""
+    """Entry point for the `api` console script (local dev server).
+
+    Host and port come from the environment (`HOST`/`PORT` in `.env`) — nothing
+    is hardcoded here.
+    """
     import uvicorn
 
-    uvicorn.run("api.main:app", host="127.0.0.1", port=8000, reload=True)
+    from api.config import get_settings
+
+    settings = get_settings()
+    uvicorn.run("api.main:app", host=settings.host, port=settings.port, reload=True)
