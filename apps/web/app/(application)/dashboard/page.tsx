@@ -1,5 +1,5 @@
-import { HugeiconsIcon } from '@hugeicons/react'
-import { Notification03Icon } from '@hugeicons/core-free-icons'
+import { Notification03Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 export default function DashboardPage() {
   return (
