@@ -11,11 +11,12 @@ This folder is the source of truth for project knowledge: architecture, conventi
 | [architecture.md](architecture.md) | Monorepo layout, tooling, apps, scripts |
 | [frontend/styling.md](frontend/styling.md) | Tailwind v4 theme, brand colors, `cn` helper |
 | [frontend/components.md](frontend/components.md) | App components + shadcn/ui registry components |
-| [frontend/forms.md](frontend/forms.md) | TanStack Form + Zod login pattern (shadcn docs pattern) |
+| [frontend/forms.md](frontend/forms.md) | TanStack Form + Zod auth-form pattern (shadcn docs pattern) |
 | [frontend/data.md](frontend/data.md) | Where static content/data lives (`lib/data/`) |
 | [frontend/icons.md](frontend/icons.md) | Icon policy — **HugeIcons only** |
 | [frontend/motion.md](frontend/motion.md) | Animation system (`motion/react`) — primitives, tokens, conventions |
-| [backend/api.md](backend/api.md) | FastAPI stub, auth status (deferred) |
+| [backend/api.md](backend/api.md) | FastAPI app — endpoints, access rules, local dev |
+| [backend/auth-and-tenancy-design.md](backend/auth-and-tenancy-design.md) | Auth + multi-tenant spec (Managed Better Auth + `app` schema RBAC) — **implemented (Phase A)** |
 | [backend/database-schema-design.md](backend/database-schema-design.md) | PostgreSQL schema design guidelines (required workflow for DB work) |
 
 ## Quick commands
@@ -23,7 +24,7 @@ This folder is the source of truth for project knowledge: architecture, conventi
 Run from the repo root:
 
 ```sh
-pnpm dev              # turbo dev (web on :3000, api)
+pnpm dev              # turbo dev — web (:3000) + api (:8000)
 pnpm lint             # biome lint .
 pnpm format           # biome format --write .
 pnpm --filter web check-types   # next typegen + tsc --noEmit
@@ -34,5 +35,6 @@ Node >= 24, pnpm `11.25.0`, Turborepo `2.x`, Biome `2.5.15`.
 
 ## Project status
 
-- **UI**: Login page is complete (UI-only — no backend calls). Dashboard route is a stub.
-- **Backend**: `apps/api` is an empty FastAPI skeleton. **No auth endpoints exist yet.** The login form's `onSubmit` has a `TODO` marking where the auth API call goes once it exists.
+- **UI**: Login page has the full two-step sign-in flow (password → email OTP), wired to Neon Auth. Sign-up (`/sign-up`) is self-service with email-OTP verification, landing in a `pending` state; platform admins approve/decline accounts at `/admin/users`. Dashboard route is a stub.
+- **Backend**: `apps/api` is a FastAPI + SQLAlchemy 2 + Alembic app. It verifies Neon Auth JWTs (EdDSA/JWKS), enforces the sign-in gate, **account approval**, RBAC, and tenant scoping. The `app` schema is migrated and seeded (6 roles, 41 permissions, approval workflow).
+- **Auth & tenancy**: identity via Neon Auth (Managed Better Auth), authorization + tenancy via our own `app` schema. Self-service sign-up is admin-approved. Spec + Phase A implementation live in [backend/auth-and-tenancy-design.md](backend/auth-and-tenancy-design.md).

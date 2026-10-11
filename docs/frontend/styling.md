@@ -45,3 +45,5 @@ It resolves conflicts (last class wins per property), so `className` props can s
 
 - Target the token first; introduce ad-hoc hardcoded colors only when a token genuinely doesn't apply.
 - The `@theme inline` block references other CSS vars via `var(--...)`; literal hex values inline fine.
+- **Auth / surface cards** use a shared translucent treatment — `rounded-3xl border-black/10 bg-[#fffafa]/70` (auth screens add `shadow-[0_24px_80px_-32px_rgba(8,47,73,0.4)]`): login, sign-up, pending, and the admin queue. Reuse it rather than inventing a new card shadow.
+- **Text links** stay quiet until hover: `text-brand-blue underline-offset-4 hover:underline` (never underline by default).

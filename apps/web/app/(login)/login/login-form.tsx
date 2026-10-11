@@ -1,15 +1,20 @@
 "use client";
 
 import {
-  CustomerServiceIcon,
+  ArrowLeft01Icon,
   EyeIcon,
   EyeOffIcon,
   LoaderIcon,
+  Mail01Icon,
+  RefreshIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FormMessage } from "@/components/auth-message";
 import { Collapse } from "@/components/motion/collapse";
 import { Reveal } from "@/components/motion/reveal";
 import { SPRING_POP, SPRING_SOFT } from "@/components/motion/variants";
@@ -36,11 +41,21 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { authClient } from "@/lib/auth/client";
 import { consents } from "@/lib/data/consents";
-import { loginSchema } from "@/lib/validations/login";
+import { type LoginValues, loginSchema } from "@/lib/validations/login";
+import { otpSchema } from "@/lib/validations/otp";
+
+type Step = "credentials" | "otp";
 
 export function LoginForm() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<Step>("credentials");
+  const [email, setEmail] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -52,233 +67,537 @@ export function LoginForm() {
     validators: {
       onSubmit: loginSchema,
     },
-    onSubmit: () => {
-      // TODO: call the authentication API once it exists.
+    onSubmit: async ({ value }) => {
+      await startSignIn(value);
     },
   });
+
+  const otpForm = useForm({
+    defaultValues: { otp: "" },
+    validators: {
+      onSubmit: otpSchema,
+    },
+    onSubmit: async ({ value }) => {
+      await completeSignIn(value.otp);
+    },
+  });
+
+  /** Step 1: verify the password, then send the email OTP. */
+  async function startSignIn(value: LoginValues) {
+    setError(null);
+    setNotice(null);
+    setPending(true);
+
+    try {
+      const { error: signInError } = await authClient.signIn.email({
+        email: value.email,
+        password: value.password,
+      });
+
+      if (signInError) {
+        setError(signInError.message ?? "Invalid email or password.");
+        return;
+      }
+
+      // The password was accepted. Record the pending second step *before*
+      // asking Managed Auth to deliver the code, so no data is reachable yet.
+      await fetch("/api/verification/start", { method: "POST" });
+
+      const { error: otpError } = await authClient.emailOtp.sendVerificationOtp(
+        {
+          email: value.email,
+          type: "sign-in",
+        },
+      );
+
+      if (otpError) {
+        setError(otpError.message ?? "Could not send the verification code.");
+        return;
+      }
+
+      setEmail(value.email);
+      otpForm.reset();
+      setStep("otp");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  /** Step 2: confirm the code, then release access. */
+  async function completeSignIn(otp: string) {
+    setError(null);
+    setNotice(null);
+    setPending(true);
+
+    try {
+      const { error: verifyError } = await authClient.signIn.emailOtp({
+        email,
+        otp,
+      });
+
+      if (verifyError) {
+        setError(verifyError.message ?? "That code is not valid.");
+        return;
+      }
+
+      await fetch("/api/verification/complete", { method: "POST" });
+
+      // Password + OTP are done. Approval is the remaining gate: a `pending`
+      // account keeps its session but goes to the waiting screen.
+      const accountResponse = await fetch("/api/backend/me");
+      if (accountResponse.ok) {
+        const account = await accountResponse.json();
+        if (!account.is_platform_admin && account.account_status !== "active") {
+          router.push("/pending");
+          router.refresh();
+          return;
+        }
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function resendCode() {
+    setError(null);
+    setNotice(null);
+    setPending(true);
+
+    try {
+      const { error: otpError } = await authClient.emailOtp.sendVerificationOtp(
+        {
+          email,
+          type: "sign-in",
+        },
+      );
+
+      if (otpError) {
+        setError(otpError.message ?? "Could not resend the code.");
+        return;
+      }
+
+      setNotice("A new code is on its way.");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <Reveal variant="scale-in" className="w-full max-w-md">
       <Card className="relative w-full rounded-3xl border-black/10 bg-[#fffafa]/70 shadow-[0_24px_80px_-32px_rgba(8,47,73,0.4)]">
         <CardHeader>
           <CardTitle className="text-2xl font-bold tracking-tight">
-            Sign in
+            {step === "credentials" ? "Sign in" : "Verify your email"}
           </CardTitle>
           <CardDescription>
-            Enter your credentials to access your account.
+            {step === "credentials"
+              ? "Enter your credentials to access your account."
+              : `We sent a 6-digit code to ${email}.`}
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          <form
-            id="login-form"
-            noValidate
-            onSubmit={(event) => {
-              event.preventDefault();
-              form.handleSubmit();
-            }}
-          >
-            <FieldGroup className="gap-4">
-              <form.Field name="email">
-                {(field) => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
+          <AnimatePresence mode="wait" initial={false}>
+            {step === "credentials" ? (
+              <motion.div
+                key="credentials"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={SPRING_SOFT}
+              >
+                <form
+                  id="login-form"
+                  noValidate
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    form.handleSubmit();
+                  }}
+                >
+                  <FieldGroup className="gap-4">
+                    <form.Field name="email">
+                      {(field) => {
+                        const isInvalid =
+                          field.state.meta.isTouched &&
+                          !field.state.meta.isValid;
 
-                  return (
-                    <Reveal delay={0.12}>
-                      <Field data-invalid={isInvalid}>
-                        <FieldLabel htmlFor={field.name}>Email</FieldLabel>
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          type="email"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(event) =>
-                            field.handleChange(event.target.value)
-                          }
-                          aria-invalid={isInvalid}
-                          placeholder="you@example.com"
-                          autoComplete="email"
-                          className="h-11 rounded-xl px-3.5 text-base md:text-base focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
-                        />
-                        <Collapse show={isInvalid}>
-                          <FieldError errors={field.state.meta.errors} />
-                        </Collapse>
-                      </Field>
-                    </Reveal>
-                  );
-                }}
-              </form.Field>
+                        return (
+                          <Reveal delay={0.12}>
+                            <Field data-invalid={isInvalid}>
+                              <FieldLabel htmlFor={field.name}>
+                                Email
+                              </FieldLabel>
+                              <Input
+                                id={field.name}
+                                name={field.name}
+                                type="email"
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(event) =>
+                                  field.handleChange(event.target.value)
+                                }
+                                aria-invalid={isInvalid}
+                                placeholder="you@example.com"
+                                autoComplete="email"
+                                className="h-11 rounded-xl px-3.5 text-base md:text-base focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
+                              />
+                              <Collapse show={isInvalid}>
+                                <FieldError errors={field.state.meta.errors} />
+                              </Collapse>
+                            </Field>
+                          </Reveal>
+                        );
+                      }}
+                    </form.Field>
 
-              <form.Field name="password">
-                {(field) => {
-                  const isInvalid =
-                    field.state.meta.isTouched && !field.state.meta.isValid;
+                    <form.Field name="password">
+                      {(field) => {
+                        const isInvalid =
+                          field.state.meta.isTouched &&
+                          !field.state.meta.isValid;
 
-                  return (
-                    <Reveal delay={0.19}>
-                      <Field data-invalid={isInvalid}>
-                        <div className="flex items-center justify-between gap-2">
-                          <FieldLabel htmlFor={field.name}>Password</FieldLabel>
-                          <a
-                            href="/forgot-password"
-                            className="text-sm font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
-                          >
-                            Forgot password?
-                          </a>
-                        </div>
-                        <InputGroup className="h-11 rounded-xl">
-                          <InputGroupInput
-                            id={field.name}
-                            name={field.name}
-                            type={showPassword ? "text" : "password"}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(event) =>
-                              field.handleChange(event.target.value)
-                            }
-                            aria-invalid={isInvalid}
-                            placeholder="••••••••"
-                            autoComplete="current-password"
-                            className="px-3.5 text-base md:text-base"
-                          />
-                          <InputGroupAddon align="inline-end">
-                            <InputGroupButton
-                              type="button"
-                              size="icon-xs"
-                              onClick={() =>
-                                setShowPassword((visible) => !visible)
-                              }
-                              aria-label={
-                                showPassword ? "Hide password" : "Show password"
-                              }
-                            >
-                              <AnimatePresence mode="wait" initial={false}>
-                                <motion.span
-                                  key={showPassword ? "hide" : "show"}
-                                  initial={{ opacity: 0, scale: 0.6 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.6 }}
-                                  transition={SPRING_POP}
-                                  className="grid place-items-center"
+                        return (
+                          <Reveal delay={0.19}>
+                            <Field data-invalid={isInvalid}>
+                              <div className="flex items-center justify-between gap-2">
+                                <FieldLabel htmlFor={field.name}>
+                                  Password
+                                </FieldLabel>
+                                <a
+                                  href="/forgot-password"
+                                  className="text-sm font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
                                 >
-                                  <HugeiconsIcon
-                                    icon={showPassword ? EyeOffIcon : EyeIcon}
-                                    size={16}
-                                    strokeWidth={1.5}
+                                  Forgot password?
+                                </a>
+                              </div>
+                              <InputGroup className="h-11 rounded-xl">
+                                <InputGroupInput
+                                  id={field.name}
+                                  name={field.name}
+                                  type={showPassword ? "text" : "password"}
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(event) =>
+                                    field.handleChange(event.target.value)
+                                  }
+                                  aria-invalid={isInvalid}
+                                  placeholder="••••••••"
+                                  autoComplete="current-password"
+                                  className="px-3.5 text-base md:text-base"
+                                />
+                                <InputGroupAddon align="inline-end">
+                                  <InputGroupButton
+                                    type="button"
+                                    size="icon-xs"
+                                    onClick={() =>
+                                      setShowPassword((visible) => !visible)
+                                    }
+                                    aria-label={
+                                      showPassword
+                                        ? "Hide password"
+                                        : "Show password"
+                                    }
+                                  >
+                                    <AnimatePresence
+                                      mode="wait"
+                                      initial={false}
+                                    >
+                                      <motion.span
+                                        key={showPassword ? "hide" : "show"}
+                                        initial={{ opacity: 0, scale: 0.6 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.6 }}
+                                        transition={SPRING_POP}
+                                        className="grid place-items-center"
+                                      >
+                                        <HugeiconsIcon
+                                          icon={
+                                            showPassword ? EyeOffIcon : EyeIcon
+                                          }
+                                          size={16}
+                                          strokeWidth={1.5}
+                                        />
+                                      </motion.span>
+                                    </AnimatePresence>
+                                  </InputGroupButton>
+                                </InputGroupAddon>
+                              </InputGroup>
+                              <Collapse
+                                show={
+                                  field.state.value.length > 0 && !isInvalid
+                                }
+                              >
+                                <PasswordRequirements
+                                  value={field.state.value}
+                                />
+                              </Collapse>
+                              <Collapse show={isInvalid}>
+                                <FieldError errors={field.state.meta.errors} />
+                              </Collapse>
+                            </Field>
+                          </Reveal>
+                        );
+                      }}
+                    </form.Field>
+
+                    {consents.map((consent, index) => (
+                      <form.Field key={consent.name} name={consent.name}>
+                        {(field) => {
+                          const isInvalid =
+                            field.state.meta.isTouched &&
+                            !field.state.meta.isValid;
+
+                          return (
+                            <Reveal delay={0.26 + index * 0.06}>
+                              <Field data-invalid={isInvalid}>
+                                <div className="flex items-center gap-2.5">
+                                  <Checkbox
+                                    id={field.name}
+                                    name={field.name}
+                                    checked={field.state.value}
+                                    onCheckedChange={(checked) =>
+                                      field.handleChange(checked === true)
+                                    }
+                                    onBlur={field.handleBlur}
+                                    aria-invalid={isInvalid}
                                   />
-                                </motion.span>
-                              </AnimatePresence>
-                            </InputGroupButton>
-                          </InputGroupAddon>
-                        </InputGroup>
-                        <Collapse show={field.state.value.length > 0 && !isInvalid}>
-                          <PasswordRequirements value={field.state.value} />
-                        </Collapse>
-                        <Collapse show={isInvalid}>
-                          <FieldError errors={field.state.meta.errors} />
-                        </Collapse>
-                      </Field>
-                    </Reveal>
-                  );
-                }}
-              </form.Field>
+                                  <FieldLabel
+                                    htmlFor={field.name}
+                                    className="font-normal"
+                                  >
+                                    {consent.text}{" "}
+                                    <a
+                                      href={consent.href}
+                                      className="inline-flex items-center gap-1 font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
+                                    >
+                                      <HugeiconsIcon
+                                        icon={consent.icon}
+                                        size={14}
+                                        strokeWidth={1.5}
+                                      />
+                                      {consent.linkLabel}
+                                    </a>
+                                  </FieldLabel>
+                                </div>
+                                <Collapse show={isInvalid}>
+                                  <FieldError
+                                    errors={field.state.meta.errors}
+                                  />
+                                </Collapse>
+                              </Field>
+                            </Reveal>
+                          );
+                        }}
+                      </form.Field>
+                    ))}
+                  </FieldGroup>
 
-              {consents.map((consent, index) => (
-                <form.Field key={consent.name} name={consent.name}>
-                  {(field) => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
+                  {error && (
+                    <div className="mt-4">
+                      <FormMessage tone="error">{error}</FormMessage>
+                    </div>
+                  )}
 
-                    return (
-                      <Reveal delay={0.26 + index * 0.06}>
-                        <Field data-invalid={isInvalid}>
-                          <div className="flex items-center gap-2.5">
-                            <Checkbox
+                  <Reveal delay={0.4} className="mt-7">
+                    <motion.div
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      transition={SPRING_SOFT}
+                    >
+                      <Button
+                        type="submit"
+                        form="login-form"
+                        className="w-full rounded-xl shadow-lg shadow-brand-green/25"
+                        disabled={pending}
+                      >
+                        {pending && (
+                          <HugeiconsIcon
+                            icon={LoaderIcon}
+                            size={16}
+                            strokeWidth={1.5}
+                            className="animate-spin"
+                          />
+                        )}
+                        {pending ? "Signing in..." : "Sign in"}
+                      </Button>
+                    </motion.div>
+                  </Reveal>
+                </form>
+
+                <Reveal delay={0.46}>
+                  <div className="mt-6 flex flex-col items-center gap-2 text-sm text-muted-foreground">
+                    <p className="flex items-center gap-1">
+                      <span>Don&apos;t have an account?</span>
+                      <Link
+                        href="/sign-up"
+                        className="font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
+                      >
+                        Request access
+                      </Link>
+                    </p>
+                    <p className="flex items-center gap-1">
+                      <span>Already requested access?</span>
+                      <Link
+                        href="/pending"
+                        className="font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
+                      >
+                        Check status
+                      </Link>
+                    </p>
+                  </div>
+                </Reveal>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="otp"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={SPRING_SOFT}
+              >
+                <form
+                  id="otp-form"
+                  noValidate
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    otpForm.handleSubmit();
+                  }}
+                >
+                  <FieldGroup className="gap-4">
+                    <otpForm.Field name="otp">
+                      {(field) => {
+                        const isInvalid =
+                          field.state.meta.isTouched &&
+                          !field.state.meta.isValid;
+
+                        return (
+                          <Field data-invalid={isInvalid}>
+                            <FieldLabel htmlFor={field.name}>
+                              Verification code
+                            </FieldLabel>
+                            <Input
                               id={field.name}
                               name={field.name}
-                              checked={field.state.value}
-                              onCheckedChange={(checked) =>
-                                field.handleChange(checked === true)
-                              }
+                              inputMode="numeric"
+                              autoComplete="one-time-code"
+                              maxLength={6}
+                              value={field.state.value}
                               onBlur={field.handleBlur}
+                              onChange={(event) =>
+                                field.handleChange(
+                                  event.target.value.replace(/\D/g, ""),
+                                )
+                              }
                               aria-invalid={isInvalid}
+                              placeholder="000000"
+                              className="h-14 rounded-xl text-center text-2xl tracking-[0.4em] focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
                             />
-                            <FieldLabel
-                              htmlFor={field.name}
-                              className="font-normal"
-                            >
-                              {consent.text}{" "}
-                              <a
-                                href={consent.href}
-                                className="inline-flex items-center gap-1 font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
-                              >
-                                <HugeiconsIcon
-                                  icon={consent.icon}
-                                  size={14}
-                                  strokeWidth={1.5}
-                                />
-                                {consent.linkLabel}
-                              </a>
-                            </FieldLabel>
-                          </div>
-                          <Collapse show={isInvalid}>
-                            <FieldError errors={field.state.meta.errors} />
-                          </Collapse>
-                        </Field>
-                      </Reveal>
-                    );
-                  }}
-                </form.Field>
-              ))}
-            </FieldGroup>
+                            <Collapse show={isInvalid}>
+                              <FieldError errors={field.state.meta.errors} />
+                            </Collapse>
+                          </Field>
+                        );
+                      }}
+                    </otpForm.Field>
+                  </FieldGroup>
 
-            <form.Subscribe selector={(state) => state.isSubmitting}>
-              {(isSubmitting) => (
-                <Reveal delay={0.4} className="mt-7">
-                  <motion.div
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    transition={SPRING_SOFT}
-                  >
-                    <Button
-                      type="submit"
-                      form="login-form"
-                      className="w-full rounded-xl shadow-lg shadow-brand-green/25"
-                      disabled={isSubmitting}
+                  {error && (
+                    <div className="mt-4">
+                      <FormMessage tone="error">{error}</FormMessage>
+                    </div>
+                  )}
+                  {notice && (
+                    <div className="mt-4">
+                      <FormMessage tone="success">{notice}</FormMessage>
+                    </div>
+                  )}
+
+                  <div className="mt-7 space-y-3">
+                    <motion.div
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      transition={SPRING_SOFT}
                     >
-                      {isSubmitting && (
+                      <Button
+                        type="submit"
+                        form="otp-form"
+                        className="w-full rounded-xl shadow-lg shadow-brand-green/25"
+                        disabled={pending}
+                      >
+                        {pending && (
+                          <HugeiconsIcon
+                            icon={LoaderIcon}
+                            size={16}
+                            strokeWidth={1.5}
+                            className="animate-spin"
+                          />
+                        )}
+                        {pending ? "Verifying..." : "Verify and continue"}
+                      </Button>
+                    </motion.div>
+
+                    <div className="flex items-center justify-between">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="rounded-xl text-muted-foreground"
+                        onClick={() => {
+                          setError(null);
+                          setNotice(null);
+                          setStep("credentials");
+                        }}
+                        disabled={pending}
+                      >
                         <HugeiconsIcon
-                          icon={LoaderIcon}
+                          icon={ArrowLeft01Icon}
                           size={16}
                           strokeWidth={1.5}
-                          className="animate-spin"
                         />
-                      )}
-                      {isSubmitting ? "Signing in..." : "Sign in"}
-                    </Button>
-                  </motion.div>
-                </Reveal>
-              )}
-            </form.Subscribe>
-          </form>
+                        Back
+                      </Button>
 
-          <Reveal delay={0.46}>
-            <p className="mt-6 flex items-center justify-center gap-1 text-sm text-muted-foreground">
-              <span>Don&apos;t have an account?</span>
-              <a
-                href="/contact"
-                className="inline-flex items-center gap-1.5 font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
-              >
-                <HugeiconsIcon
-                  icon={CustomerServiceIcon}
-                  size={16}
-                  strokeWidth={1.5}
-                />
-                Contact us
-              </a>
-            </p>
-          </Reveal>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="rounded-xl text-brand-blue"
+                        onClick={resendCode}
+                        disabled={pending}
+                      >
+                        <HugeiconsIcon
+                          icon={RefreshIcon}
+                          size={16}
+                          strokeWidth={1.5}
+                        />
+                        Resend code
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+
+                <Reveal delay={0.2}>
+                  <p className="mt-6 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+                    <HugeiconsIcon
+                      icon={Mail01Icon}
+                      size={16}
+                      strokeWidth={1.5}
+                    />
+                    <span>
+                      Codes expire shortly. Check spam if it is missing.
+                    </span>
+                  </p>
+                </Reveal>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </CardContent>
       </Card>
     </Reveal>

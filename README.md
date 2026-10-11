@@ -1,159 +1,89 @@
-# Turborepo starter
+# rjs-accounts
 
-This Turborepo starter is maintained by the Turborepo core team.
+Accounts management application that helps with finance.
 
-## Using this example
+A Turborepo + pnpm monorepo: a Next.js web app, a FastAPI backend, and shared
+packages. Authentication uses **Neon Auth (Managed Better Auth)** for identity;
+authorization, tenancy, and roles are owned by the app in a Postgres `app` schema,
+served through **FastAPI as the single data-access layer**.
 
-Run the following command:
+> **Status:** Phase A implemented — sign-in (password → email OTP), self-service
+> sign-up with admin approval, RBAC, and multi-tenant scoping. No finance tables
+> yet. See [docs/](docs/README.md) for details.
 
-```sh
-npx create-turbo@latest
-```
+## What's inside
 
-## What's inside?
+### Apps and packages
 
-This Turborepo includes the following packages/apps:
+- `apps/web` — the application: [Next.js](https://nextjs.org) 16 (App Router),
+  React 19, Tailwind CSS v4, Biome.
+- `apps/api` — FastAPI + SQLAlchemy 2 + Alembic (Python via [`uv`](https://docs.astral.sh/uv/)):
+  verifies Neon Auth JWTs, enforces the sign-in/approval gates, RBAC, and tenancy.
+- `packages/ui` — stub React component library (`@repo/ui`).
+- `packages/typescript-config` — shared `tsconfig.json`s.
 
-### Apps and Packages
+### Tooling
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- **Turborepo** + **pnpm** for the monorepo; **Biome** for linting and formatting
+  (there is **no** ESLint or Prettier here).
+- **uv** for the Python backend; **Alembic** for migrations.
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Prerequisites
 
-### Utilities
+- Node >= 24, pnpm `11.25.0`
+- Python + [`uv`](https://docs.astral.sh/uv/)
+- A Neon project with **Auth enabled** (the `.neon` link supplies the branches)
 
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+## Getting started
 
 ```sh
-cd my-turborepo
-turbo build
+pnpm install
 ```
 
-Without global `turbo`, use your package manager:
+Fill in the environment files:
+
+- `apps/web/.env.local` — copy `apps/web/.env.example` (`NEON_AUTH_*`, `API_BASE_URL`).
+- `apps/api/.env` — copy `apps/api/.env.example` (`DATABASE_URL*`, `NEON_AUTH_*`, SMTP).
+
+Then, from the root:
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
+pnpm dev                 # turbo: web on :3000 + api on :8000
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Apply migrations (first run / after pulling schema changes):
 
 ```sh
-turbo build --filter=docs
+cd apps/api && uv run alembic upgrade head
 ```
 
-Without global `turbo`:
+Bootstrap the first platform admin (they approve everyone else):
 
 ```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+cd apps/api && uv run seed-admin you@example.com
 ```
 
-### Develop
+## Scripts
 
-To develop all apps and packages, run the following command:
+Run from the repo root:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+| Script | Does |
+|---|---|
+| `pnpm dev` | `turbo run dev` — web (`:3000`) + api (`:8000`) |
+| `pnpm build` | `turbo run build` |
+| `pnpm lint` | `biome lint .` |
+| `pnpm format` | `biome format --write .` |
+| `pnpm check-types` | `turbo run check-types` |
+| `pnpm --filter web build` | production build of the web app |
 
-```sh
-cd my-turborepo
-turbo dev
-```
+## Documentation
 
-Without global `turbo`, use your package manager:
+The docs in [`docs/`](docs/README.md) are the source of truth:
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
+- [docs/architecture.md](docs/architecture.md) — monorepo layout, apps, tooling
+- [docs/frontend/](docs/frontend) — styling, components, forms, data, icons, motion
+- [docs/backend/api.md](docs/backend/api.md) — FastAPI endpoints, access rules, local dev
+- [docs/backend/auth-and-tenancy-design.md](docs/backend/auth-and-tenancy-design.md) — auth + multi-tenant spec
+- [docs/backend/database-schema-design.md](docs/backend/database-schema-design.md) — schema guidelines
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Contributing or using an AI agent? Start with [`AGENTS.md`](AGENTS.md).

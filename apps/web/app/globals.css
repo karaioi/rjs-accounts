@@ -132,8 +132,7 @@
   }
 }
 
-
-::selection{
+::selection {
   background-color: var(--color-brand-blue);
   color: white;
 }

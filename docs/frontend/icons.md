@@ -28,6 +28,11 @@ ls node_modules/.pnpm/@hugeicons+core-free-icons@*/node_modules/@hugeicons/core-
 
 ## Current icon usage
 
-- Login form: `EyeIcon`/`EyeOffIcon` (password visibility toggle), `LoaderIcon` (submit spinner)
+- Auth forms (login + sign-up): `EyeIcon`/`EyeOffIcon` (password visibility toggle), `LoaderIcon` (submit spinner), `Mail01Icon` (email / OTP), `RefreshIcon` (resend OTP), `ArrowLeft01Icon` (back), `SecurityCheckIcon`
+- Pending screen (`app/(login)/pending/`): `Clock01Icon`
+- Admin approval queue (`app/(application)/admin/users/`): `UserSearch01Icon`, `UserCheck01Icon`, `UserRemove01Icon`, `RefreshIcon`, `CheckmarkCircle02Icon`
+- Dashboard stub: `Notification03Icon`, `UserCheck01Icon`
+- Inline messages (`components/auth-message.tsx`): `AlertCircleIcon`, `CheckmarkCircle02Icon`
+- Consent rows (`lib/data/consents.ts`): `LegalDocument01Icon`, `Shield01Icon`
 - Hero panel (`lib/data/promo.ts`): `BanknoteIcon`, `InvoiceIcon`, `Analytics01Icon`
 - Checkbox: `CheckIcon`

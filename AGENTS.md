@@ -20,13 +20,15 @@ Read the docs in [`docs/`](docs/README.md) before working on the project — the
 - **docs/README.md** — index + quick commands + status
 - **docs/architecture.md** — monorepo layout (Turborepo + pnpm), apps, tooling
 - **docs/frontend/** — styling (Tailwind v4 tokens), components (incl. shadcn/ui registry), the TanStack Form + Zod pattern, data/content organization, HugeIcons policy, motion/animation system
-- **docs/backend/api.md** — FastAPI stub status (no auth yet)
+- **docs/backend/api.md** — FastAPI app: endpoint surface, access rules (gates/RBAC), local dev
+- **docs/backend/auth-and-tenancy-design.md** — auth + multi-tenant design: Managed Better Auth for identity, `app` schema for RBAC/tenancy (`customer → organization → membership → role`), two-step sign-in (password → email OTP), RLS. Read before touching auth/tenancy.
 - **docs/backend/database-schema-design.md** — PostgreSQL schema design guidelines (follow before any database schema work)
 
 ## Quick context
 
-- **Monorepo**: Turborepo 2.x + pnpm 11.25.0. Apps: `web` (Next.js 16 App Router, React 19, Tailwind v4, Biome) and `api` (FastAPI + uv stub, no endpoints).
-- **Login page** (`apps/web/app/(login)/login/`): UI-complete using the shadcn TanStack Form pattern (`@tanstack/react-form` + Zod v4), `noValidate`, `aria-invalid`/`data-invalid`. `onSubmit` is a stub with a TODO for the future auth API — do not add fake backend behavior.
+- **Monorepo**: Turborepo 2.x + pnpm 11.25.0. `pnpm dev` (root) runs **both** apps via turbo — web on `:3000` and api on `:8000` (`apps/api/package.json` has the `dev` script; don't start uvicorn separately while it runs). Apps: `web` (Next.js 16 App Router, React 19, Tailwind v4, Biome) and `api` (FastAPI + SQLAlchemy 2 + Alembic, auth + tenancy — see [docs/backend/api.md](docs/backend/api.md)).
+- **Login page** (`apps/web/app/(login)/login/`): full two-step sign-in — email + password, then a 6-digit email OTP — using the shadcn TanStack Form pattern (`@tanstack/react-form` + Zod v4), `noValidate`, `aria-invalid`/`data-invalid`. It calls Neon Auth through `apps/web/lib/auth/` and relays the backend sign-in gate via `apps/web/app/api/verification/`. Password policy is **8–64** chars.
+- **Sign-up & approval** (`apps/web/app/(login)/sign-up/`, `.../pending/`, `apps/web/app/(application)/admin/users/`): self-service sign-up with email-OTP verification; the account lands in `pending` (`POST /api/v1/auth/register`) until a platform admin approves it (`/admin/users` → `POST /api/v1/users/{id}/approve|reject`). Shared `AuthShell` + `FormMessage` components. `apps/web/app/api/backend/[...path]/` is a generic same-origin relay to FastAPI.
 - **Icons**: HugeIcons only (`@hugeicons/core-free-icons` + `@hugeicons/react`). Never use lucide or other icon sets.
 - **Animation**: `motion` (`motion/react`) via the shared primitives in `apps/web/components/motion/` (`Reveal`, `Stagger`/`StaggerItem`, `Collapse`) — see docs/frontend/motion.md. Reduced motion is handled globally.
 - **Brand colors** (`globals.css` `@theme inline`): `brand-green` `#2d803d`, `brand-blue` `#2b66a9` — use as Tailwind utilities anywhere (`bg-brand-green`, `text-brand-blue`, opacity variants).

@@ -1,11 +1,16 @@
 import { LegalDocument01Icon, Shield01Icon } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
-import type { LoginValues } from "@/lib/validations/login";
+
+/**
+ * The consent checkboxes required by both `loginSchema` and `signUpSchema`, kept
+ * as a literal union so this list can't silently drift from either form.
+ */
+export type ConsentField = "termsAccepted" | "privacyAccepted";
 
 /** A required consent checkbox whose label links to a policy document. */
 export interface Consent {
-  /** Field name in `loginSchema` (`@/lib/validations/login`). */
-  name: keyof LoginValues;
+  /** Field name shared by the login and sign-up schemas. */
+  name: ConsentField;
   /** Lead-in text before the link, e.g. "I agree to the". */
   text: string;
   /** Anchor label, e.g. "Terms & Conditions". */
@@ -17,8 +22,8 @@ export interface Consent {
 }
 
 /**
- * Consents shown on the login form. Tied to `loginSchema` via the `name`
- * field so adding/removing one can't silently drift from validation.
+ * Consents shown on the sign-in and sign-up forms. Tied to the shared schemas
+ * via the `name` field so adding/removing one can't drift from validation.
  */
 export const consents = [
   {

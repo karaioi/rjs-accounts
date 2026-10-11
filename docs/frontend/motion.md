@@ -51,13 +51,14 @@ Animates content in/out by height, so validation errors and the password checkli
 </Collapse>
 ```
 
-Note: `StaggerItem`/`Stagger` are plain `motion.div`s, so wrapping a flex child in them makes the wrapper the flex item — keep gap/padding classes on the wrapper or the child as before (the promo panel and login form do this deliberately).
+Note: `StaggerItem`/`Stagger` are plain `motion.div`s, so wrapping a flex child in them makes the wrapper the flex item — keep gap/padding classes on the wrapper or the child as before (the promo panel and auth forms do this deliberately).
 
 ## Where it's used
 
 - `PromoPanel` — staggered logo → title → description → feature cards; feature cards have a spring hover-lift and a rotating icon chip (`FeatureCard`).
-- `login-form.tsx` — card `scale-in`, each field fades up with a small delay, the eye toggle and password-rule checks pop with `SPRING_POP`, errors/checklist via `Collapse`, and the submit button has a subtle press/scale.
-- `login/page.tsx` — the right-panel logo fades in (`Reveal`); `page.tsx` stays a server component and simply renders the client `Reveal`.
+- `login-form.tsx` / `sign-up-form.tsx` — card `scale-in`, each field fades up with a small delay, the eye toggle and password-rule checks pop with `SPRING_POP`, errors/checklist via `Collapse`, step transitions via `AnimatePresence`, and the submit button has a subtle press/scale.
+- Auth pages (`login/page.tsx`, `pending/page.tsx`) — the right-panel logo/content fades in (`Reveal`); the `page.tsx` files stay server components and just render the client `Reveal`.
+- `AuthShell`, `FormMessage` (`auth-*.tsx`) and the admin approval queue fade content in via `Reveal`.
 - `PasswordRequirements` — each rule's icon cross-fades/scales between circle and checkmark via `AnimatePresence`.
 
 ## Rules of thumb

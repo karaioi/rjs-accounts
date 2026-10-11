@@ -8,12 +8,17 @@
 
 ```
 apps/web/lib/
+├── api/
+│   └── server.ts     # server-side fetch → FastAPI (attaches bearer token)
+├── auth/             # Neon Auth server + browser clients
 ├── utils.ts
 ├── data/
-│   ├── consents.ts   # login consent checkboxes
+│   ├── consents.ts   # shared login/sign-up consent checkboxes
 │   └── promo.ts      # login promo content
 └── validations/
-    └── login.ts      # login form Zod schema (see forms.md)
+    ├── password.ts   # shared password schema (see forms.md)
+    ├── login.ts      # login form Zod schema
+    └── sign-up.ts    # sign-up form Zod schema
 ```
 
 ## `lib/data/promo.ts`
@@ -25,12 +30,13 @@ Exports:
 
 ## `lib/data/consents.ts`
 
-Exports the login form's required consent checkboxes as one source of truth:
+Exports the consent checkboxes required by **both** `loginSchema` and `signUpSchema` as one source of truth:
 
-- `Consent` — interface: `name` (a key of `LoginValues`, so it can't drift from the schema), `text`, `linkLabel`, `href`, `icon` (`IconSvgElement`).
-- `consents` — `as const satisfies readonly Consent[]`; the form maps over it to render a `Checkbox` per row. The `as const` keeps `name` a literal union so it stays assignable to TanStack Form's typed `name` prop.
+- `ConsentField` — `"termsAccepted" | "privacyAccepted"` literal union shared with both schemas.
+- `Consent` — interface: `name` (`ConsentField`, so it can't drift from either schema), `text`, `linkLabel`, `href`, `icon` (`IconSvgElement`).
+- `consents` — `as const satisfies readonly Consent[]`; the forms map over it to render a `Checkbox` per row. The `as const` keeps `name` a literal union so it stays assignable to TanStack Form's typed `name` prop.
 
-Adding a consent here without adding it to `loginSchema` (or vice versa) is a type error, because `name` is `keyof LoginValues`.
+Adding a consent here without adding it to the schemas (or vice versa) is a type error, because `name` is `ConsentField`.
 
 
 ## Convention for new content

@@ -2,11 +2,11 @@
 
 ## Stack
 
-- **Monorepo**: Turborepo `2.x` + pnpm `11.25.0` (`pnpm-workspace.yaml` covers `apps/*`, `packages/*`)
+- **Monorepo**: Turborepo `2.x` + pnpm `11.25.0` (`pnpm-workspace.yaml` covers `apps/*`, `packages/*`). `apps/api` is a workspace too (has a `package.json` with a `dev` script that runs uvicorn via `uv`), so `pnpm dev` starts **web + api together**.
 - **Node**: >= 24 (see `engines` in root `package.json`)
 - **Apps / packages**:
   - `apps/web` — Next.js **16.3.8** (App Router), React **19.2.8**, TypeScript 7, Tailwind CSS **v4**, Biome. The main application.
-  - `apps/api` — FastAPI + uv stub (Python). No endpoints yet.
+  - `apps/api` — **FastAPI + SQLAlchemy 2 + Alembic** (Python via `uv`). Auth (Neon Auth JWT verification), the two-step sign-in gate, account approval, RBAC, and multi-tenant scoping over the `app` schema. See [backend/api.md](backend/api.md).
   - `packages/ui` — stub React component library (`@repo/ui`): `card.tsx`, `code.tsx`, `button.tsx` stubs.
   - `packages/typescript-config` — shared TypeScript configs.
 
@@ -30,20 +30,51 @@
 
 ```
 app/
-  (login)/login/page.tsx        # composition only (no data, see lib/data)
-  (login)/login/login-form.tsx  # TanStack Form login (UI-only)
-  (application)/dashboard/page.tsx  # stub
+  (login)/login/            # two-step sign-in (password → email OTP)
+  (login)/sign-up/          # self-service sign-up (email-verified → pending)
+  (login)/pending/          # "awaiting approval" screen
+  (application)/dashboard/  # stub (guards approval + admin link)
+  (application)/admin/users/  # platform-admin approval queue
+  api/auth/[...path]/       # Neon Auth proxy route
+  api/backend/[...path]/    # same-origin relay → FastAPI (/api/v1/*)
+  api/verification/         # sign-in gate relay (GET/start/complete)
   layout.tsx, globals.css, shadcn.css
 components/
   Beams.tsx          # animated beams background (client)
+  auth-message.tsx   # shared <FormMessage /> (error/success)
+  auth-shell.tsx     # shared split layout (PromoPanel + form column)
   feature-card.tsx   # <FeatureCard /> + Feature type
+  password-requirements.tsx  # live password-rule checklist
   promo-panel.tsx    # <PromoPanel /> (Beams + hero content)
+  motion/            # Reveal, Stagger/StaggerItem, Collapse + variants
   ui/                # shadcn registry components (base-ui)
 lib/
+  api/server.ts      # server-side fetch → FastAPI (attaches bearer token)
+  auth/              # Neon Auth server + browser clients
+  data/              # static content (promo, consents)
   utils.ts
-  data/promo.ts      # static promo content
+  validations/       # Zod schemas (login, sign-up, otp, password)
 ```
 
 ## Dev server
 
-`apps/web` dev runs on **port 3000**. A dev server may already be running (user-run) — starting another one fails with `EADDRINUSE`; reuse the existing one for browser checks (it HMR-serves changes).
+`pnpm dev` (root) runs every workspace's `dev` task via turbo:
+
+- `apps/web` → **port 3000** (`next dev`)
+- `apps/api` → **port 8000** (`uv run uvicorn api.main:app --reload`)
+
+The API must not be started separately while `pnpm dev` is running — the second
+listener fails with `EADDRINUSE`. To run only the API: `cd apps/api && uv run
+uvicorn api.main:app --reload`.
+
+## Neon configuration
+
+- **`.neon`** — the project link (`neon link`) that pins the branch; `neon` commands run against it.
+- **`neon.ts`** (root) — declarative Neon policy via `@neon/config/v1`: `auth: true` (Managed Better Auth) and an `uploads` object-storage bucket (`access: "private"`). Edit this file, then reconcile a branch:
+
+  ```sh
+  neon config plan     # dry run: show the diff for the linked branch
+  neon config apply    # apply the policy
+  ```
+
+- The **Neon CLI** (`neon@8.x`) is installed globally with pnpm. `pnpm setup` (once per machine) puts `PNPM_HOME` (`~/Library/pnpm` on macOS) on `PATH` so the `neon` command resolves in new shells; reload with `source ~/.zshrc`.

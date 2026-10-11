@@ -35,6 +35,14 @@ export interface Feature {
 
 Glass card (`bg-white/10 backdrop-blur-sm rounded-3xl`) with a brand-blue icon chip. Accepts `feature` + optional `className`. Client component: springs upward with a slight scale on hover and rotates its icon chip (`whileHover`/`whileTap` variants) — see [motion.md](motion.md).
 
+### `auth-shell.tsx` — `<AuthShell />`
+
+Shared split layout for the unauthenticated screens (`/login`, `/sign-up`, `/pending`): `<PromoPanel>` branded panel on the left (`w-[60%]`) and a centered form column on the right (logo + `children`), so every auth screen stays visually identical. Server component.
+
+### `auth-message.tsx` — `<FormMessage />`
+
+Shared inline form feedback used by the auth forms: `tone="error"` renders `role="alert"` in destructive styling, `tone="success"` renders `role="status"` in brand-green. Wrapped in `<Reveal variant="fade-in">`.
+
 ### `password-requirements.tsx` — `<PasswordRequirements />`
 
 Live password-strength checklist. Props: `value: string` (+ optional `className`). Renders each rule with a green checkmark (`CheckmarkCircle01Icon`) when satisfied and a muted circle otherwise:
@@ -44,7 +52,7 @@ Live password-strength checklist. Props: `value: string` (+ optional `className`
 - At least one number
 - At least one special character
 
-Reusable for any password field (login, signup, change password). The rules live here in one place — keep in sync with the Zod schema used for validation. Client component: each rule's icon pops/cross-fades between circle and checkmark (`AnimatePresence` + `SPRING_POP`).
+Reusable for any password field (login, signup, change password). The rules live here in one place — keep in sync with the shared `passwordSchema` in `lib/validations/password.ts` (both auth forms use it). Client component: each rule's icon pops/cross-fades between circle and checkmark (`AnimatePresence` + `SPRING_POP`).
 
 ## shadcn/ui registry components (`apps/web/components/ui/`)
 
@@ -61,4 +69,4 @@ pnpm dlx shadcn@latest add <component>
 
 ## Form components (field, input-group)
 
-Used by the login form — full pattern in [forms.md](forms.md).
+Used by the login and sign-up forms — full pattern in [forms.md](forms.md).

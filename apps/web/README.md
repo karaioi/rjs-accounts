@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# rjs-accounts web
 
-## Getting Started
+Next.js (App Router, React 19, Tailwind v4, Biome) frontend for `rjs-accounts`.
+It owns the unauthenticated surfaces — sign-in, self-service sign-up, and the
+pending/approval screens — and talks to Neon Auth (Managed Better Auth) for
+identity, relaying backend calls to the FastAPI app in `apps/api`.
 
-First, run the development server:
+See [`docs/frontend/`](../../docs/frontend) for styling, components, forms, data,
+icons, and motion conventions, and
+[`docs/backend/auth-and-tenancy-design.md`](../../docs/backend/auth-and-tenancy-design.md)
+for the auth + tenancy model.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Getting started
+
+From the repo **root**:
+
+```sh
+pnpm dev          # turbo: web (:3000) + api (:8000) together
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000>. To run just this app:
+`pnpm --filter web dev`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+Copy `.env.example` to `.env.local` and fill it in (`neon env pull` writes the
+Auth values):
 
-## Learn More
+```sh
+NEON_AUTH_BASE_URL=        # Neon Auth origin
+NEON_AUTH_JWKS_URL=        # JWKS endpoint for JWT verification
+NEON_AUTH_COOKIE_SECRET=   # openssl rand -base64 32
+API_BASE_URL=http://127.0.0.1:8000   # server-side only
+```
 
-To learn more about Next.js, take a look at the following resources:
+The web app holds **auth values + the API base URL only** — never database or
+storage credentials (those belong to `apps/api`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Layout
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+  (login)/login/        # two-step sign-in (password → email OTP)
+  (login)/sign-up/      # self-service sign-up (email-verified → pending)
+  (login)/pending/      # "awaiting approval" screen
+  (application)/dashboard/     # stub (guards approval + admin link)
+  (application)/admin/users/   # platform-admin approval queue
+  api/auth/[...path]/   # Neon Auth proxy
+  api/backend/[...path]/ # same-origin relay → FastAPI
+  api/verification/     # sign-in gate relay
+components/             # app components (auth shell/message, motion, …) + ui/
+lib/                    # api client, auth clients, data, validations
+```
 
-## Deploy on Vercel
+Route protection lives in `proxy.ts` (Next 16 middleware).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sh
+pnpm --filter web dev          # next dev --port 3000
+pnpm --filter web build        # production build
+pnpm --filter web check-types  # next typegen + tsc --noEmit
+pnpm lint                      # biome (repo root)
+```
