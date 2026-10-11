@@ -21,6 +21,8 @@ class MeOut(BaseModel):
     user_id: uuid.UUID
     email: str | None
     name: str | None
+    # Raw `neon_auth.user.role`; `is_platform_admin` is exactly `role == "admin"`.
+    platform_role: str | None
     is_platform_admin: bool
     account_status: str
     email_verified: bool

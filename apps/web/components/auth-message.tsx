@@ -6,11 +6,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Reveal } from "@/components/motion/reveal";
 
 /**
- * Inline form feedback shared by the auth screens. Errors announce themselves
- * to assistive tech; success messages are a polite status.
+ * Inline form feedback shared by the auth screens, built on the shadcn `Alert`.
+ * Errors announce themselves to assistive tech; success messages are a polite
+ * status.
  */
 export function FormMessage({
   tone,
@@ -23,22 +25,22 @@ export function FormMessage({
 
   return (
     <Reveal variant="fade-in">
-      <div
+      <Alert
         role={isError ? "alert" : "status"}
-        className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${
+        variant={isError ? "destructive" : "default"}
+        className={
           isError
-            ? "border-destructive/20 bg-destructive/5 text-destructive"
-            : "border-brand-green/20 bg-brand-green/5 text-brand-green"
-        }`}
+            ? "items-center rounded-xl border-destructive/20 bg-destructive/5"
+            : "items-center rounded-xl border-brand-green/20 bg-brand-green/5 text-brand-green *:data-[slot=alert-description]:text-brand-green"
+        }
       >
         <HugeiconsIcon
           icon={isError ? AlertCircleIcon : CheckmarkCircle02Icon}
           size={16}
           strokeWidth={1.5}
-          className="mt-0.5 shrink-0"
         />
-        <span>{children}</span>
-      </div>
+        <AlertDescription>{children}</AlertDescription>
+      </Alert>
     </Reveal>
   );
 }

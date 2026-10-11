@@ -41,6 +41,7 @@ class Principal:
     user_id: uuid.UUID
     email: str | None
     name: str | None
+    platform_role: str | None
     is_platform_admin: bool
     account_status: str
     email_verified: bool
@@ -115,6 +116,7 @@ def get_principal(
         user_id=user_id,
         email=row["email"],
         name=row["name"],
+        platform_role=row["role"],
         is_platform_admin=is_platform_admin,
         account_status=account_status,
         email_verified=bool(row["emailVerified"]),

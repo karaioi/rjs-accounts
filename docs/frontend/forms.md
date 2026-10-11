@@ -27,7 +27,7 @@ const form = useForm({
   defaultValues: { email: "", password: "" },
   validators: { onSubmit: <domain>Schema },
   // The handler owns the request + `pending`/`error` state — no fake submit,
-  // no toasts; failures surface via <FormMessage tone="error">.
+  // no toasts; failures surface via <ErrorDialog /> (see components.md).
   onSubmit: async ({ value }) => {
     await handleSubmit(value);
   },
@@ -66,7 +66,9 @@ const form = useForm({
 - **`aria-invalid` + `data-invalid`** on the field (`Field data-invalid`, input `aria-invalid`) for a11y + styling.
 - **Submit button** is disabled while a `pending` state is set (before/after the async auth call) and shows an inline `LoaderIcon` spinner while submitting.
 - Standard Schema issues carry `{ message }` so `FieldError errors={field.state.meta.errors}` maps to readable text; multiple failures render as a list.
-- **Errors from the auth call** (not Zod) render in the shared `<FormMessage tone="error">` (see components.md) below the fields; success/status notices use `tone="success"`.
+- **Errors from the auth call** (not Zod) open the shared `<ErrorDialog />` (shadcn `Dialog` — see components.md); success/status notices use the inline `<FormMessage tone="success">`. Managed Auth errors go through `describeAuthError` (`lib/auth/errors.ts`), which compares the provider `code` case-insensitively (e.g. the API's `INVALID_EMAIL_OR_PASSWORD` vs the thrown `invalid_credentials`) and maps it to friendly copy, falling back to the provider's own message when the code is unrecognised (e.g. the generic `validation_failed`) so the user always sees the real reason. Never fall back to a bland "something went wrong".
+- **Forms are `method="post"`.** React's `onSubmit` calls `preventDefault()`, but if a submit lands before hydration the browser would otherwise fall back to a native GET and leak the email/password into the URL + history. `post` keeps credentials out of the URL.
+- **OTP step** uses the shared `<OtpField />` (shadcn `InputOTP`, six slots split 2–2–2 with dividers — see components.md) bound to the `otp` field; its `onChange` strips non-digits and `otpSchema` enforces exactly six.
 
 ## Password policy (shared)
 
@@ -105,4 +107,4 @@ The rows are generated from the `consents` array in `apps/web/lib/data/consents.
 
 ## Status
 
-**Wired to Neon Auth.** `login-form.tsx` signs in with `authClient.signIn.email({ email, password })` then drives the two-step gate: `emailOtp.sendVerificationOtp({ type: "sign-in" })` → user enters the code → `authClient.signIn.emailOtp(...)`, the app marks the login verified via `/api/verification/complete`, then `/api/backend/me` decides between `/dashboard` (approved) and `/pending` (awaiting approval). `sign-up-form.tsx` does `authClient.signUp.email(...)` → email-verification OTP (`emailOtp.verifyEmail`) → `POST /api/backend/auth/register` to create the `pending` profile. Both keep the UI faithful: no fake submit, no toasts/redirects-on-error — auth errors surface inline in `FormMessage`.
+**Wired to Neon Auth.** `login-form.tsx` signs in with `authClient.signIn.email({ email, password })` then drives the two-step gate: `emailOtp.sendVerificationOtp({ type: "sign-in" })` → user enters the code (`<OtpField />`) → `authClient.signIn.emailOtp(...)`, the app marks the login verified via `/api/verification/complete`, then `/api/backend/me` decides between `/dashboard` (approved) and `/pending` (awaiting approval). `sign-up-form.tsx` does `authClient.signUp.email(...)` → email-verification OTP (`emailOtp.verifyEmail`, `<OtpField />`) → `POST /api/backend/auth/register` to create the `pending` profile. Both keep the UI faithful: no fake submit, no toasts/redirects-on-error — auth errors open `<ErrorDialog />`, with `describeAuthError` turning provider codes into readable copy.

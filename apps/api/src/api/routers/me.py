@@ -30,6 +30,7 @@ def read_me(
         user_id=principal.user_id,
         email=principal.email,
         name=principal.name,
+        platform_role=principal.platform_role,
         is_platform_admin=principal.is_platform_admin,
         account_status=principal.account_status,
         email_verified=principal.email_verified,

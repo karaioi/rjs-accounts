@@ -15,9 +15,11 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
 import { FormMessage } from "@/components/auth-message";
+import { ErrorDialog } from "@/components/error-dialog";
 import { Collapse } from "@/components/motion/collapse";
 import { Reveal } from "@/components/motion/reveal";
 import { SPRING_POP, SPRING_SOFT } from "@/components/motion/variants";
+import { OtpField } from "@/components/otp-field";
 import { PasswordRequirements } from "@/components/password-requirements";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +44,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { authClient } from "@/lib/auth/client";
+import { describeAuthError } from "@/lib/auth/errors";
 import { consents } from "@/lib/data/consents";
 import { otpSchema } from "@/lib/validations/otp";
 import { type SignUpValues, signUpSchema } from "@/lib/validations/sign-up";
@@ -110,8 +113,10 @@ export function SignUpForm() {
 
       if (signUpError) {
         setError(
-          signUpError.message ??
+          describeAuthError(
+            signUpError,
             "We could not create your account. Please try again.",
+          ),
         );
         return;
       }
@@ -124,15 +129,22 @@ export function SignUpForm() {
       );
 
       if (otpError) {
-        setError(otpError.message ?? "Could not send the verification code.");
+        setError(
+          describeAuthError(otpError, "Could not send the verification code."),
+        );
         return;
       }
 
       setEmail(value.email);
       otpForm.reset();
       setStep("otp");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(
+        describeAuthError(
+          error,
+          "We couldn't create your account. Please try again.",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -151,7 +163,7 @@ export function SignUpForm() {
       });
 
       if (verifyError) {
-        setError(verifyError.message ?? "That code is not valid.");
+        setError(describeAuthError(verifyError, "That code is not valid."));
         return;
       }
 
@@ -167,8 +179,13 @@ export function SignUpForm() {
       }
 
       setStep("pending");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(
+        describeAuthError(
+          error,
+          "We couldn't verify that code. Please try again.",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -188,13 +205,18 @@ export function SignUpForm() {
       );
 
       if (otpError) {
-        setError(otpError.message ?? "Could not resend the code.");
+        setError(describeAuthError(otpError, "Could not resend the code."));
         return;
       }
 
       setNotice("A new code is on its way.");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(
+        describeAuthError(
+          error,
+          "We couldn't resend the code. Please try again.",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -230,6 +252,7 @@ export function SignUpForm() {
               <StepShell key="details">
                 <form
                   id="sign-up-form"
+                  method="post"
                   noValidate
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -440,12 +463,6 @@ export function SignUpForm() {
                     ))}
                   </FieldGroup>
 
-                  {error && (
-                    <div className="mt-4">
-                      <FormMessage tone="error">{error}</FormMessage>
-                    </div>
-                  )}
-
                   <Reveal delay={0.4} className="mt-7">
                     <motion.div
                       whileHover={{ scale: 1.01 }}
@@ -490,6 +507,7 @@ export function SignUpForm() {
               <StepShell key="otp">
                 <form
                   id="sign-up-otp-form"
+                  method="post"
                   noValidate
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -508,22 +526,13 @@ export function SignUpForm() {
                             <FieldLabel htmlFor={field.name}>
                               Verification code
                             </FieldLabel>
-                            <Input
+                            <OtpField
                               id={field.name}
                               name={field.name}
-                              inputMode="numeric"
-                              autoComplete="one-time-code"
-                              maxLength={6}
                               value={field.state.value}
+                              invalid={isInvalid}
+                              onChange={field.handleChange}
                               onBlur={field.handleBlur}
-                              onChange={(event) =>
-                                field.handleChange(
-                                  event.target.value.replace(/\D/g, ""),
-                                )
-                              }
-                              aria-invalid={isInvalid}
-                              placeholder="000000"
-                              className="h-14 rounded-xl text-center text-2xl tracking-[0.4em] focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
                             />
                             <Collapse show={isInvalid}>
                               <FieldError errors={field.state.meta.errors} />
@@ -534,11 +543,6 @@ export function SignUpForm() {
                     </otpForm.Field>
                   </FieldGroup>
 
-                  {error && (
-                    <div className="mt-4">
-                      <FormMessage tone="error">{error}</FormMessage>
-                    </div>
-                  )}
                   {notice && (
                     <div className="mt-4">
                       <FormMessage tone="success">{notice}</FormMessage>
@@ -655,6 +659,16 @@ export function SignUpForm() {
             )}
           </AnimatePresence>
         </CardContent>
+
+        <ErrorDialog
+          title={
+            step === "details"
+              ? "Couldn't create your account"
+              : "Couldn't verify your code"
+          }
+          message={error}
+          onClose={() => setError(null)}
+        />
       </Card>
     </Reveal>
   );

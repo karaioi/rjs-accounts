@@ -9,12 +9,14 @@
 ```
 apps/web/lib/
 ├── api/
-│   └── server.ts     # server-side fetch → FastAPI (attaches bearer token)
+│   ├── server.ts     # server-side fetch → FastAPI (attaches bearer token)
+│   └── types.ts      # response shapes consumed from FastAPI (e.g. MeResponse)
 ├── auth/             # Neon Auth server + browser clients
 ├── utils.ts
 ├── data/
 │   ├── consents.ts   # shared login/sign-up consent checkboxes
-│   └── promo.ts      # login promo content
+│   ├── promo.ts      # login promo content
+│   └── roles.ts      # display copy for RBAC slugs (platform + org roles)
 └── validations/
     ├── password.ts   # shared password schema (see forms.md)
     ├── login.ts      # login form Zod schema
@@ -37,6 +39,15 @@ Exports the consent checkboxes required by **both** `loginSchema` and `signUpSch
 - `consents` — `as const satisfies readonly Consent[]`; the forms map over it to render a `Checkbox` per row. The `as const` keeps `name` a literal union so it stays assignable to TanStack Form's typed `name` prop.
 
 Adding a consent here without adding it to the schemas (or vice versa) is a type error, because `name` is `ConsentField`.
+
+## `lib/data/roles.ts`
+
+Display copy for the RBAC values the API reports, so components never print a raw slug (or a blank cell). Exports:
+
+- `platformRoles: Record<string, RoleCopy>` — copy for `neon_auth.user.role` (`admin` → "Platform administrator").
+- `orgRoles: readonly OrgRoleCopy[]` — the six seeded `app.role` rows (`owner` … `viewer`), most privileged first.
+- `accountStatuses: Record<string, StatusCopy>` — label + `BadgeTone` for `app.user_profile.status`.
+- Helpers `platformRole(role)`, `orgRole(slug)`, `accountStatus(status)` — each falls back to a readable value (the slug itself) for anything this build doesn't know, so a role added later still shows up instead of rendering nothing.
 
 
 ## Convention for new content

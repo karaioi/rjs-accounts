@@ -11,6 +11,7 @@ from .config import get_settings
 from .routers import (
     audit,
     auth_gate,
+    auth_webhooks,
     customers,
     me,
     members,
@@ -43,6 +44,7 @@ API_PREFIX = "/api/v1"
 app.include_router(me.router, prefix=API_PREFIX)
 app.include_router(reference.router, prefix=API_PREFIX)
 app.include_router(auth_gate.router, prefix=API_PREFIX)
+app.include_router(auth_webhooks.router, prefix=API_PREFIX)
 app.include_router(registration.router, prefix=API_PREFIX)
 app.include_router(users.router, prefix=API_PREFIX)
 app.include_router(customers.router, prefix=API_PREFIX)

@@ -33,7 +33,7 @@ app/
   (login)/login/            # two-step sign-in (password → email OTP)
   (login)/sign-up/          # self-service sign-up (email-verified → pending)
   (login)/pending/          # "awaiting approval" screen
-  (application)/dashboard/  # stub (guards approval + admin link)
+  (application)/dashboard/  # "Your access" summary (identity + roles) + admin link
   (application)/admin/users/  # platform-admin approval queue
   api/auth/[...path]/       # Neon Auth proxy route
   api/backend/[...path]/    # same-origin relay → FastAPI (/api/v1/*)
@@ -41,17 +41,21 @@ app/
   layout.tsx, globals.css, shadcn.css
 components/
   Beams.tsx          # animated beams background (client)
-  auth-message.tsx   # shared <FormMessage /> (error/success)
+  access-summary.tsx # <AccessSummary /> — identity, platform role, memberships
+  auth-message.tsx   # shared <FormMessage /> (shadcn Alert; error/success)
   auth-shell.tsx     # shared split layout (PromoPanel + form column)
+  error-dialog.tsx   # <ErrorDialog /> (shadcn Dialog) for auth failures
   feature-card.tsx   # <FeatureCard /> + Feature type
+  otp-field.tsx      # <OtpField /> (shadcn InputOTP, 6-digit code as 2–2–2)
   password-requirements.tsx  # live password-rule checklist
   promo-panel.tsx    # <PromoPanel /> (Beams + hero content)
   motion/            # Reveal, Stagger/StaggerItem, Collapse + variants
   ui/                # shadcn registry components (base-ui)
 lib/
   api/server.ts      # server-side fetch → FastAPI (attaches bearer token)
+  api/types.ts       # response shapes consumed from FastAPI (e.g. MeResponse)
   auth/              # Neon Auth server + browser clients
-  data/              # static content (promo, consents)
+  data/              # static content (promo, consents, roles)
   utils.ts
   validations/       # Zod schemas (login, sign-up, otp, password)
 ```

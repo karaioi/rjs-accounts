@@ -43,7 +43,13 @@ pnpm install
 Fill in the environment files:
 
 - `apps/web/.env.local` — copy `apps/web/.env.example` (`NEON_AUTH_*`, `API_BASE_URL`).
-- `apps/api/.env` — copy `apps/api/.env.example` (`DATABASE_URL*`, `NEON_AUTH_*`, SMTP).
+- `apps/api/.env` — copy `apps/api/.env.example` (`DATABASE_URL*`, `NEON_AUTH_*`, `APP_NAME`, mailer: `MAIL_PROVIDER`/`RESEND_API_KEY`/`MAIL_FROM`/`SMTP_*`).
+
+> The API's mailer also delivers the sign-in and verification OTPs. It takes over
+> sending with a Neon Auth `send.otp` webhook, which is why the sender address and
+> template are ours. Without a mail transport configured that endpoint answers
+> `503`; registering the webhook also needs a public HTTPS URL (a tunnel in local
+> development). See [auth-and-tenancy-design.md §14](docs/backend/auth-and-tenancy-design.md#14-email-strategy).
 
 Then, from the root:
 

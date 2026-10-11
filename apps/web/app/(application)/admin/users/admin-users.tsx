@@ -72,7 +72,11 @@ export function AdminUsers({
       );
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(
+        action === "approve"
+          ? "Could not approve that account. Please try again."
+          : "Could not decline that account. Please try again.",
+      );
     } finally {
       setBusyId(null);
     }

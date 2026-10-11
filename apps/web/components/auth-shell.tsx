@@ -35,7 +35,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
             height={1227}
             alt="rjs-accounts-logo"
             loading="eager"
-            className="relative size-12 object-contain"
+            className="relative w-15 object-contain"
           />
         </Reveal>
 

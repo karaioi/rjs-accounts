@@ -5,6 +5,7 @@ committed. The same variables are produced by `neon env pull`.
 """
 
 from functools import lru_cache
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,10 +34,23 @@ class Settings(BaseSettings):
 
     # --- Application ------------------------------------------------------
     app_schema: str = "app"
+    # Product name used in branded emails (subject lines and headers).
+    app_name: str = "RJS Accounts"
     environment: str = "development"
     cors_origins: list[str] = ["http://localhost:3000"]
 
-    # --- SMTP (provider-agnostic app mailer) ------------------------------
+    # --- App mailer (provider-agnostic) -----------------------------------
+    # Transport: "auto" picks Resend when RESEND_API_KEY is set, then SMTP when
+    # SMTP_HOST is set, and otherwise logs the message (development).
+    mail_provider: Literal["auto", "resend", "smtp"] = "auto"
+    # Shared From address for every transport; falls back to SMTP_FROM.
+    mail_from: str | None = None
+
+    # --- Resend (https://resend.com) HTTP API transport -------------------
+    resend_api_key: str | None = None
+    resend_api_url: str = "https://api.resend.com/emails"
+
+    # --- SMTP transport ---------------------------------------------------
     # Empty in development: the mailer logs instead of sending.
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -44,6 +58,11 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str | None = None
     smtp_use_tls: bool = True
+
+    @property
+    def mail_sender(self) -> str | None:
+        """The `From` address used by every mailer transport."""
+        return self.mail_from or self.smtp_from
 
     @property
     def issuer(self) -> str:

@@ -41,7 +41,7 @@ Every decision below was made explicitly with the project owner.
 | D6 | **Platform admin is external** (`user.role='admin'`), seeded, bypasses tenant scoping. | Admins provision customers/orgs and are not employees of any customer. |
 | D7 | Customer registration **and** org activation are admin-gated (not self-service). | Keeps control of who enters the system while the product is young. |
 | D8 | **Email + password, then email OTP** (two-step). OTP alone is also allowed. | Requested. Implemented at the app layer because **Managed Auth has no MFA/2FA** (see [§17](#17-risks--limitations)). |
-| D9 | **Email:** Neon shared SMTP in dev; **Gmail SMTP (free, app password)** for now in non-dev; **Resend later** once a domain exists. The app mailer is **provider-agnostic**. | The project does not yet own a business domain, and Resend requires a verified domain. Gmail SMTP is free and works immediately; swapping providers is a config change, not a code change. |
+| D9 | **Email:** one **provider-agnostic** app mailer — **Resend** (HTTP API) or **SMTP**, chosen by env — and it sends **auth OTP too**, via a Neon Auth `send.otp` webhook, so sender and template are ours. | Neon has no dashboard email templating, and its shared SMTP always sends from `auth@mail.myneon.app`. Taking delivery over is the only way to satisfy "from our address, in our theme". Switching providers stays a config change, not a code change ([§14](#14-email-strategy)). |
 | D10 | Tenant isolation enforced in the **API layer and RLS**. | Defence in depth, per the project's schema guidelines. |
 | D11 | `created_at`/`updated_at` everywhere **now**; `app.audit_log` **now**. | There is an `auditor` role and admin-gated flows; both are cheap to add now and expensive to retrofit. |
 | D12 | All reads/writes via **FastAPI**. | Single authorization choke point; the browser never holds DB credentials. |
@@ -70,7 +70,7 @@ Every decision below was made explicitly with the project owner.
 - `neon_auth.user` columns we rely on: `id uuid PK`, `email text unique`, `name`, `emailVerified`, **`role`** (platform admin flag), `banned`, `banReason`, `banExpires`.
 - Managed Auth also provisions `organization`, `member`, `invitation` — **these stay unused** (we own tenancy). Documented so nobody "helpfully" starts using them.
 - Repo state *at design time* (baseline this spec was written against — all of it is now implemented, see the status line and §18): no ORM, no migrations, no DB code; `apps/api` was an empty FastAPI stub; `apps/web` login page was UI-only.
-- Managed Auth sends its own verification / OTP / password-reset emails — we do not build those.
+- Managed Auth *can* send its own verification / OTP / password-reset emails, but we **take OTP and magic-link delivery over with a webhook** and send them ourselves so the sender and template are ours — see [§14](#14-email-strategy).
 
 ---
 
@@ -477,17 +477,55 @@ Managed Auth `requestPasswordReset` → emailed code/link → `resetPassword`. A
 
 ## 14. Email strategy
 
-The application talks to a **provider-agnostic SMTP mailer** (env-configured). Two distinct email sources exist:
+The application talks to a **provider-agnostic mailer** (env-configured). It supports **Resend** (HTTP API) and **SMTP**; the transport is auto-detected — `RESEND_API_KEY` set → Resend, else `SMTP_HOST` set → SMTP, else the message is **logged** (development). Force one with `MAIL_PROVIDER=resend|smtp|auto`. `MAIL_FROM` is the shared `From` address for every transport (falls back to `SMTP_FROM`). Two distinct email sources exist:
 
 | Source | Emails | Dev | Now (no business domain) | Later |
 |---|---|---|---|---|
-| **Neon Auth** | verification, OTP, password reset | Neon shared SMTP (free, zero config) | Neon shared SMTP, or Gmail SMTP as *custom SMTP* | Resend custom SMTP |
-| **Our app** (`apps/api`) | temp password / provisioning notices | Gmail SMTP (free, app password) | Gmail SMTP | Resend |
+| **Our app** (`apps/api`, `mailer.py`) | sign-in OTP, verification OTP, password-reset links, temp-password / provisioning notices | logged (no transport) | Resend (`RESEND_API_KEY`) or Gmail SMTP | Resend |
+| **Neon Auth** | *(only what our webhook does not take over)* | Neon shared SMTP (free, zero config) | Neon shared SMTP | custom SMTP |
 
-- Managed Auth's shared SMTP (`auth@mail.myneon.app`) is **free and immediate** but unbranded and intended for development.
-- Because the project currently has a **normal Gmail account, not a business domain**, we use free options: **Gmail SMTP (app password)** for both app mail and, optionally, as Neon Auth's custom SMTP. No cost, no domain required.
-- **Resend becomes a one-line config change** (swap SMTP host/credentials) once a verified sending domain exists. No application code changes.
-- Branding of Managed Auth's own templates is limited to Neon's `customize-emails` mechanism; fully bespoke branded auth mail would be an app-layer concern later.
+### 14.1 OTP delivery runs through our mailer (Neon Auth webhooks)
+
+By default Managed Auth sends its own verification/OTP mail from its shared SMTP (`auth@mail.myneon.app`) using its own template. Neon exposes **no dashboard email templating**, so the only way to control both the **sender address** and the **template** is to take the delivery over with a **webhook**. We do:
+
+1. The branch's Neon Auth webhook is subscribed to **`send.otp`** and **`send.magic_link`** (project-scoped, one per branch).
+2. When an OTP/link is created, Neon **skips its own email** and POSTs the event to **`POST /api/v1/auth/webhooks/neon`**.
+3. That endpoint **verifies an Ed25519 detached JWS** signature (`X-Neon-Signature`, `X-Neon-Signature-Kid`, `X-Neon-Timestamp`) against the Neon Auth JWKS, rejects deliveries older than five minutes, and ignores replays of the same `X-Neon-Event-Id`.
+4. It renders the branded template (`apps/api/src/api/emails.py`) — same palette as the app (`#2d803d` / `#2b66a9`, card `#fffafa`), the code shown as the **same 2–2–2 pairs** as the OTP input — and sends it through `mailer.py`, so it leaves from `MAIL_FROM`.
+
+Consequences worth knowing:
+
+- **The app mailer is now production-critical** — with no transport configured, the webhook answers **503** rather than pretending to succeed, so a code is never silently dropped (Neon retries; the user sees an error).
+- **Neon's `customize-emails` guide is the reference** (`https://neon.com/docs/auth/guides/customize-emails`). `customize-email` → webhook is the supported path; there is no template editor.
+- Setting the **application name** in the Neon Auth config (`update_auth_config`) still matters for anything Neon itself sends (e.g. organization invitations).
+- Everything is **per branch**: enabling the webhook on a dev branch leaves production on Neon's sender until it is enabled there too.
+- Managed Auth's shared SMTP (`auth@mail.myneon.app`) remains the zero-config fallback while a branch has no webhook.
+- Because the project currently has a **normal Gmail account, not a business domain**, we use free options: `onboarding@resend.dev` (Resend's test sender, which may only send to the account owner's address) until a domain is verified.
+- Resend needs a **verified sending domain**; switching providers stays an env change, not a code change.
+
+### 14.2 Registering the webhook
+
+The webhook lives on the FastAPI service and needs a **public HTTPS URL** — in local development that means a tunnel (e.g. `cloudflared tunnel --url http://localhost:8000` or `ngrok http 8000`). Register it once per branch:
+
+```bash
+# Console: Project → Settings → Auth → Webhooks → Add
+#   URL:    https://<public-host>/api/v1/auth/webhooks/neon
+#   Events: send.otp, send.magic_link
+
+# …or with the Neon CLI:
+neon neon-auth config webhook update \
+  --project-id <project> --branch-id <branch> \
+  --url https://<public-host>/api/v1/auth/webhooks/neon \
+  --events send.otp,send.magic_link
+```
+
+There is no MCP tool for webhooks or the email provider — use the Console, the CLI, or the Neon REST API.
+
+The endpoint is public by design (Neon has no bearer token); **the signature check is the authentication**. It must not be placed behind an auth dependency, and it must read the **raw body** before parsing so the signature stays valid.
+
+### 14.3 Other app email
+
+The app mailer also handles mail that is purely ours — provisioning notices and temp passwords for `POST /organizations/{id}/members` — with `send_email(..., html=...)` for a rich alternative to the plain-text body.
 
 ---
 
@@ -497,9 +535,12 @@ All routes are under `/api/v1` and require a verified JWT unless noted.
 
 | Method | Path | Permission | Notes |
 |---|---|---|---|
-| `GET` | `/me` | authenticated | user, platform role, `account_status`, memberships, `must_change_password` |
+| `GET` | `/me` | authenticated | user, `platform_role` (raw) + `is_platform_admin`, `account_status`, memberships, `must_change_password` |
 | `GET` | `/roles` · `/permissions` | authenticated | reference data |
 | `POST` | `/auth/register` | authenticated | create own `user_profile` in `pending` (idempotent; requires `emailVerified`) |
+| `GET` | `/auth/login/verification` | authenticated | read the sign-in OTP step state |
+| `POST` | `/auth/login/verification/start` · `/complete` | authenticated | open / satisfy the sign-in OTP step |
+| `POST` | `/auth/webhooks/neon` | **public — Ed25519 signature is the auth** | Neon Auth `send.otp` / `send.magic_link` delivery; sends the branded email via `mailer.py` ([§14.1](#141-otp-delivery-runs-through-our-mailer-neon-auth-webhooks)) |
 | `GET` | `/users` | platform admin | approval queue; `?status=pending\|active\|suspended\|rejected` |
 | `POST` | `/users/{id}/approve` · `/users/{id}/reject` | platform admin | activate / decline an account |
 | `GET` | `/customers` | platform admin | list tenants |
@@ -513,7 +554,7 @@ All routes are under `/api/v1` and require a verified JWT unless noted.
 | `DELETE` | `/organizations/{id}/members/{user_id}` | `member:remove` | hard delete + audit |
 | `GET` | `/audit-logs` | `audit:read` | org-scoped |
 
-The login-verification gate (`otp_required`) and the account-approval gate apply to every route above except `/me`, `/auth/register`, and the verification routes (which must stay reachable by a pending user). Admin routes (`/users`, `/customers`, org approve) require the OTP step **too** — platform admins don't skip the gate, only the approval check.
+The login-verification gate (`otp_required`) and the account-approval gate apply to every route above except `/me`, `/auth/register`, the verification routes (which must stay reachable by a pending user), and `/auth/webhooks/neon` (which is not an application route at all — Neon Auth calls it before the user has a session, and its Ed25519 signature is its authentication). Admin routes (`/users`, `/customers`, org approve) require the OTP step **too** — platform admins don't skip the gate, only the approval check.
 
 ---
 
@@ -555,7 +596,7 @@ The login-verification gate (`otp_required`) and the account-approval gate apply
 
 `apps/web/.env.local` (see `.env.example`) — the `NEON_AUTH_BASE_URL`, `NEON_AUTH_JWKS_URL`, and `NEON_AUTH_COOKIE_SECRET` values, plus `API_BASE_URL` (the FastAPI origin, used **server-side only** in the route handlers/relay, so no `NEXT_PUBLIC_` prefix). Generate the cookie secret with `openssl rand -base64 32`. The web app holds **auth values + the API base URL only** — never DB or storage credentials (those belong to `apps/api`).
 
-`apps/api/.env` — `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (direct, migrations), `NEON_AUTH_JWKS_URL`, `NEON_AUTH_BASE_URL`, `ENVIRONMENT`, `CORS_ORIGINS` (must include the web origin, e.g. `["http://localhost:3000"]`), and optional SMTP settings. Until the `app_runtime` role exists ([§17](#17-risks--limitations) risk 6) both URLs use the owner role: RLS is in place but bypassed by the owner, so **the API layer is what enforces tenancy today**.
+`apps/api/.env` — `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (direct, migrations), `NEON_AUTH_JWKS_URL`, `NEON_AUTH_BASE_URL`, `ENVIRONMENT`, `CORS_ORIGINS` (must include the web origin, e.g. `["http://localhost:3000"]`), `APP_NAME` (branding in emails), and the mailer settings (`MAIL_PROVIDER`, `RESEND_API_KEY`, `MAIL_FROM`, `SMTP_*`). The mailer is production-critical now that it delivers the sign-in OTP ([§14.1](#141-otp-delivery-runs-through-our-mailer-neon-auth-webhooks)), so `RESEND_API_KEY` + `MAIL_FROM` (or `SMTP_*`) must be set wherever the webhook is registered. Until the `app_runtime` role exists ([§17](#17-risks--limitations) risk 6) both URLs use the owner role: RLS is in place but bypassed by the owner, so **the API layer is what enforces tenancy today**.
 
 ### Common commands
 

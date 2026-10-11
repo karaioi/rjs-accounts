@@ -15,9 +15,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormMessage } from "@/components/auth-message";
+import { ErrorDialog } from "@/components/error-dialog";
 import { Collapse } from "@/components/motion/collapse";
 import { Reveal } from "@/components/motion/reveal";
 import { SPRING_POP, SPRING_SOFT } from "@/components/motion/variants";
+import { OtpField } from "@/components/otp-field";
 import { PasswordRequirements } from "@/components/password-requirements";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +44,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { authClient } from "@/lib/auth/client";
+import { describeAuthError } from "@/lib/auth/errors";
 import { consents } from "@/lib/data/consents";
 import { type LoginValues, loginSchema } from "@/lib/validations/login";
 import { otpSchema } from "@/lib/validations/otp";
@@ -95,7 +98,7 @@ export function LoginForm() {
       });
 
       if (signInError) {
-        setError(signInError.message ?? "Invalid email or password.");
+        setError(describeAuthError(signInError, "Invalid email or password."));
         return;
       }
 
@@ -111,15 +114,22 @@ export function LoginForm() {
       );
 
       if (otpError) {
-        setError(otpError.message ?? "Could not send the verification code.");
+        setError(
+          describeAuthError(otpError, "Could not send the verification code."),
+        );
         return;
       }
 
       setEmail(value.email);
       otpForm.reset();
       setStep("otp");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(
+        describeAuthError(
+          error,
+          "We couldn't sign you in. Check your connection and try again.",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -138,7 +148,7 @@ export function LoginForm() {
       });
 
       if (verifyError) {
-        setError(verifyError.message ?? "That code is not valid.");
+        setError(describeAuthError(verifyError, "That code is not valid."));
         return;
       }
 
@@ -158,8 +168,13 @@ export function LoginForm() {
 
       router.push("/dashboard");
       router.refresh();
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(
+        describeAuthError(
+          error,
+          "We couldn't verify that code. Please try again.",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -179,13 +194,18 @@ export function LoginForm() {
       );
 
       if (otpError) {
-        setError(otpError.message ?? "Could not resend the code.");
+        setError(describeAuthError(otpError, "Could not resend the code."));
         return;
       }
 
       setNotice("A new code is on its way.");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      setError(
+        describeAuthError(
+          error,
+          "We couldn't resend the code. Please try again.",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -217,6 +237,7 @@ export function LoginForm() {
               >
                 <form
                   id="login-form"
+                  method="post"
                   noValidate
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -401,12 +422,6 @@ export function LoginForm() {
                     ))}
                   </FieldGroup>
 
-                  {error && (
-                    <div className="mt-4">
-                      <FormMessage tone="error">{error}</FormMessage>
-                    </div>
-                  )}
-
                   <Reveal delay={0.4} className="mt-7">
                     <motion.div
                       whileHover={{ scale: 1.01 }}
@@ -434,26 +449,29 @@ export function LoginForm() {
                 </form>
 
                 <Reveal delay={0.46}>
-                  <div className="mt-6 flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                    <p className="flex items-center gap-1">
-                      <span>Don&apos;t have an account?</span>
+                  <p className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-muted-foreground">
+                    <span>
+                      Don&apos;t have an account?{" "}
                       <Link
                         href="/sign-up"
                         className="font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
                       >
                         Request access
                       </Link>
-                    </p>
-                    <p className="flex items-center gap-1">
-                      <span>Already requested access?</span>
-                      <Link
-                        href="/pending"
-                        className="font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
-                      >
-                        Check status
-                      </Link>
-                    </p>
-                  </div>
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="text-muted-foreground/40"
+                    >
+                      |
+                    </span>
+                    <Link
+                      href="/pending"
+                      className="font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
+                    >
+                      Check status
+                    </Link>
+                  </p>
                 </Reveal>
               </motion.div>
             ) : (
@@ -466,6 +484,7 @@ export function LoginForm() {
               >
                 <form
                   id="otp-form"
+                  method="post"
                   noValidate
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -484,22 +503,13 @@ export function LoginForm() {
                             <FieldLabel htmlFor={field.name}>
                               Verification code
                             </FieldLabel>
-                            <Input
+                            <OtpField
                               id={field.name}
                               name={field.name}
-                              inputMode="numeric"
-                              autoComplete="one-time-code"
-                              maxLength={6}
                               value={field.state.value}
+                              invalid={isInvalid}
+                              onChange={field.handleChange}
                               onBlur={field.handleBlur}
-                              onChange={(event) =>
-                                field.handleChange(
-                                  event.target.value.replace(/\D/g, ""),
-                                )
-                              }
-                              aria-invalid={isInvalid}
-                              placeholder="000000"
-                              className="h-14 rounded-xl text-center text-2xl tracking-[0.4em] focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
                             />
                             <Collapse show={isInvalid}>
                               <FieldError errors={field.state.meta.errors} />
@@ -510,11 +520,6 @@ export function LoginForm() {
                     </otpForm.Field>
                   </FieldGroup>
 
-                  {error && (
-                    <div className="mt-4">
-                      <FormMessage tone="error">{error}</FormMessage>
-                    </div>
-                  )}
                   {notice && (
                     <div className="mt-4">
                       <FormMessage tone="success">{notice}</FormMessage>
@@ -599,6 +604,16 @@ export function LoginForm() {
             )}
           </AnimatePresence>
         </CardContent>
+
+        <ErrorDialog
+          title={
+            step === "otp"
+              ? "Couldn't verify your code"
+              : "Couldn't sign you in"
+          }
+          message={error}
+          onClose={() => setError(null)}
+        />
       </Card>
     </Reveal>
   );
