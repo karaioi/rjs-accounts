@@ -39,7 +39,7 @@ Glass card (`bg-white/10 backdrop-blur-sm rounded-3xl`) with a brand-blue icon c
 
 Live password-strength checklist. Props: `value: string` (+ optional `className`). Renders each rule with a green checkmark (`CheckmarkCircle01Icon`) when satisfied and a muted circle otherwise:
 
-- At least 12 characters
+- At least 8 characters
 - At least one uppercase / lowercase letter
 - At least one number
 - At least one special character

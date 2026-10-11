@@ -4,15 +4,12 @@ import {
   CustomerServiceIcon,
   EyeIcon,
   EyeOffIcon,
-  LegalDocument01Icon,
   LoaderIcon,
-  Shield01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import * as z from "zod";
 import { Collapse } from "@/components/motion/collapse";
 import { Reveal } from "@/components/motion/reveal";
 import { SPRING_POP, SPRING_SOFT } from "@/components/motion/variants";
@@ -39,44 +36,8 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-
-const loginSchema = z.object({
-  email: z.email("Enter a valid email address."),
-  password: z
-    .string()
-    .min(12, "Password must be at least 12 characters.")
-    .max(64, "Password must be at most 64 characters.")
-    .regex(/[A-Z]/, "Password must include at least one uppercase letter.")
-    .regex(/[a-z]/, "Password must include at least one lowercase letter.")
-    .regex(/[0-9]/, "Password must include at least one number.")
-    .regex(
-      /[^A-Za-z0-9]/,
-      "Password must include at least one special character.",
-    ),
-  termsAccepted: z
-    .boolean()
-    .refine((value) => value, "You must accept the Terms & Conditions."),
-  privacyAccepted: z
-    .boolean()
-    .refine((value) => value, "You must accept the Privacy Policy."),
-});
-
-const consents = [
-  {
-    name: "termsAccepted",
-    text: "I agree to the",
-    linkLabel: "Terms & Conditions",
-    href: "/terms",
-    icon: LegalDocument01Icon,
-  },
-  {
-    name: "privacyAccepted",
-    text: "I have read the",
-    linkLabel: "Privacy Policy",
-    href: "/privacy",
-    icon: Shield01Icon,
-  },
-] as const;
+import { consents } from "@/lib/data/consents";
+import { loginSchema } from "@/lib/validations/login";
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -211,12 +172,10 @@ export function LoginForm() {
                             </InputGroupButton>
                           </InputGroupAddon>
                         </InputGroup>
-                        <Collapse show={field.state.value.length > 0}>
+                        <Collapse show={field.state.value.length > 0 && !isInvalid}>
                           <PasswordRequirements value={field.state.value} />
                         </Collapse>
-                        <Collapse
-                          show={isInvalid && field.state.value.length === 0}
-                        >
+                        <Collapse show={isInvalid}>
                           <FieldError errors={field.state.meta.errors} />
                         </Collapse>
                       </Field>

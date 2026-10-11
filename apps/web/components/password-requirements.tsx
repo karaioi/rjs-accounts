@@ -8,8 +8,8 @@ import { SPRING_POP } from "@/components/motion/variants";
 
 const passwordRules: { test: (value: string) => boolean; label: string }[] = [
   {
-    test: (value) => value.length >= 12,
-    label: "At least 12 characters",
+    test: (value) => value.length >= 8,
+    label: "At least 8 characters",
   },
   {
     test: (value) => /[A-Z]/.test(value),

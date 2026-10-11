@@ -12,14 +12,20 @@ The login form (`apps/web/app/(login)/login/login-form.tsx`) implements the shad
 ## Pattern (copy for new forms)
 
 ```tsx
-const schema = z.object({
+// apps/web/lib/validations/<domain>.ts  — schema lives here, not in the component
+import * as z from "zod";
+export const <domain>Schema = z.object({
   email: z.email("Enter a valid email address."),
   password: z.string().min(...).regex(...),
 });
+export type <Domain>Values = z.infer<typeof <domain>Schema>;
+
+// apps/web/app/.../<name>-form.tsx — imports schema + content, no inline data
+import { <domain>Schema } from "@/lib/validations/<domain>";
 
 const form = useForm({
   defaultValues: { email: "", password: "" },
-  validators: { onSubmit: schema },
+  validators: { onSubmit: <domain>Schema },
   onSubmit: () => { /* TODO: call API */ },
 });
 
@@ -49,6 +55,7 @@ const form = useForm({
 
 ## Key conventions
 
+- **Schema + content live outside the component**: the Zod schema is in `apps/web/lib/validations/<domain>.ts` (e.g. `login.ts`, exporting `loginSchema` + `LoginValues`); static content like the consent rows is in `apps/web/lib/data/<domain>.ts` (see [data.md](data.md)). The form component only imports them — no inline schema or data.
 - **`noValidate`** on the `<form>` so native `required`/`minLength` never preempt Zod — `FieldError` output drives validation display.
 - **Validation timing**: form-level `onSubmit` **only**. On submit, TanStack Form v1.33 marks every field touched, so `isTouched && !isValid` displays each error; a later successful submit clears them.
   - ⚠️ **Do not add a form-level `onBlur` validator alongside `onSubmit`.** In `@tanstack/form-core` 1.33.5 it stores errors under the `blur` key, which `handleSubmit`'s `validateAllFields("submit")` pass cannot clear. Once a submit fails, `isFieldsValid` stays `false`, `handleSubmit` bails before the form-level validation that would clear the errors, and **every subsequent submit keeps showing the stale errors even after the user fixes the fields**. Keep validation at `onSubmit` (per-field validators are the alternative if blur-time feedback is ever needed).
@@ -58,9 +65,9 @@ const form = useForm({
 
 ## Password policy (login form)
 
-`z.string()` → min 12 / max 64 chars, must include at least one uppercase, one lowercase, one number, and one special character (`/[^A-Za-z0-9]/`).
+`z.string()` → min 8 / max 64 chars, must include at least one uppercase, one lowercase, one number, and one special character (`/[^A-Za-z0-9]/`).
 
-While the user types, a live checklist (`PasswordRequirements`, see components.md) shows each rule turning **green** as it's satisfied. The red `FieldError` list only appears for the empty-password case; for partial passwords the checklist itself shows what's still missing.
+While the user types, a live checklist (`PasswordRequirements`, see components.md) shows each rule turning **green** as it's satisfied. Once the field is invalid (touched on blur/submit), the red `FieldError` list replaces the checklist — so a too-short password surfaces a clear "Password must be at least 8 characters." instead of only the muted checklist. Because field state re-validates live, the red list shrinks as rules are fixed and the green checklist returns once every rule passes. The two are mutually exclusive (`value.length > 0 && !isInvalid` vs `isInvalid`), so they never render together.
 
 ## Consent (login form)
 
@@ -89,7 +96,7 @@ Each is a `z.boolean().refine((value) => value, "You must accept the ...")` fiel
 </Field>
 ```
 
-The rows are generated from a `consents` array (`name`/`text`/`linkLabel`/`href`/`icon`) so the two are defined in one place. Base UI's `Checkbox` overrides the root `id` with its own generated one but sets the given `id` on its hidden `<input>`, so `FieldLabel htmlFor={field.name}` still resolves correctly.
+The rows are generated from the `consents` array in `apps/web/lib/data/consents.ts` (`name`/`text`/`linkLabel`/`href`/`icon`) so the two are defined in one place, and `name` is typed as `keyof LoginValues` so the rows can't drift from `loginSchema`. Base UI's `Checkbox` overrides the root `id` with its own generated one but sets the given `id` on its hidden `<input>`, so `FieldLabel htmlFor={field.name}` still resolves correctly.
 
 ## Status
 
