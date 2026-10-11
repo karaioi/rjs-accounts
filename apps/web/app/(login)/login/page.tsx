@@ -1,12 +1,13 @@
 import Image from "next/image";
 
+import { Reveal } from "@/components/motion/reveal";
 import { PromoPanel } from "@/components/promo-panel";
 import { promo } from "@/lib/data/promo";
 import { LoginForm } from "./login-form";
 
 export default function Login() {
   return (
-    <div className="h-screen w-screen flex justify-between items-center p-2 gap-4">
+    <div className="h-screen w-screen flex justify-between items-center">
       <PromoPanel
         className="w-[60%]"
         logo={
@@ -15,6 +16,7 @@ export default function Login() {
             width={4501}
             height={1227}
             alt="rjs-accounts-logo"
+            loading="eager"
             className="w-32 h-auto object-cover"
           />
         }
@@ -22,13 +24,16 @@ export default function Login() {
       />
 
       <div className="w-[40%] h-full relative overflow-hidden flex flex-col justify-center items-center">
-        <Image
-          src={"/login-logo.png"}
-          width={4501}
-          height={1227}
-          alt="rjs-accounts-logo"
-          className="w-42 mb-8 object-contain"
-        />
+        <Reveal variant="fade-in" delay={0.05} className="mb-8">
+          <Image
+            src={"/login-logo.png"}
+            width={4501}
+            height={1227}
+            alt="rjs-accounts-logo"
+            loading="eager"
+            className="relative w-42 object-contain"
+          />
+        </Reveal>
 
         <LoginForm />
       </div>

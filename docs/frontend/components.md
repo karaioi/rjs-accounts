@@ -21,7 +21,7 @@ interface PromoPanelProps extends ComponentPropsWithoutRef<"div"> {
 }
 ```
 
-Sections render only when provided; `features` defaults to `[]` and the grid is skipped when empty. Server component (no hooks) — safe without `"use client"` (verified `@hugeicons/react` renders pure SVG).
+Sections render only when provided; `features` defaults to `[]` and the grid is skipped when empty. Client component (`"use client"`) — it staggers its content on mount and drives `FeatureCard`'s hover animations; see [motion.md](motion.md). The server `page.tsx` still passes the `logo` element (an `<Image />`) as a prop.
 
 ### `feature-card.tsx` — `<FeatureCard />` + `Feature` type
 
@@ -33,7 +33,18 @@ export interface Feature {
 }
 ```
 
-Glass card (`bg-white/10 backdrop-blur-sm rounded-3xl`) with a brand-blue icon chip. Accepts `feature` + optional `className`.
+Glass card (`bg-white/10 backdrop-blur-sm rounded-3xl`) with a brand-blue icon chip. Accepts `feature` + optional `className`. Client component: springs upward with a slight scale on hover and rotates its icon chip (`whileHover`/`whileTap` variants) — see [motion.md](motion.md).
+
+### `password-requirements.tsx` — `<PasswordRequirements />`
+
+Live password-strength checklist. Props: `value: string` (+ optional `className`). Renders each rule with a green checkmark (`CheckmarkCircle01Icon`) when satisfied and a muted circle otherwise:
+
+- At least 12 characters
+- At least one uppercase / lowercase letter
+- At least one number
+- At least one special character
+
+Reusable for any password field (login, signup, change password). The rules live here in one place — keep in sync with the Zod schema used for validation. Client component: each rule's icon pops/cross-fades between circle and checkmark (`AnimatePresence` + `SPRING_POP`).
 
 ## shadcn/ui registry components (`apps/web/components/ui/`)
 

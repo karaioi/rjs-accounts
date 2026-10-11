@@ -1,7 +1,10 @@
+"use client";
+
 import { cn } from "cn";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import Beams, { type BeamsProps } from "@/components/Beams";
 import { type Feature, FeatureCard } from "@/components/feature-card";
+import { Stagger, StaggerItem } from "@/components/motion/reveal";
 
 interface PromoPanelProps extends ComponentPropsWithoutRef<"div"> {
   logo?: ReactNode;
@@ -23,7 +26,7 @@ export function PromoPanel({
   return (
     <div
       className={cn(
-        "relative h-full overflow-hidden rounded-3xl bg-black text-white",
+        "relative h-full overflow-hidden bg-black text-white",
         className,
       )}
       {...props}
@@ -52,22 +55,34 @@ export function PromoPanel({
       />
 
       <div className="absolute top-1/2 left-1/2 -translate-1/2 w-full px-15">
-        {logo && <div className="mb-6">{logo}</div>}
-        <h1 className="mt-4 text-balance text-4xl font-bold tracking-tight md:text-5xl">
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-5 text-base leading-relaxed text-white/70 md:text-lg">
-            {description}
-          </p>
-        )}
-        {features.length > 0 && (
-          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {features.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} />
-            ))}
-          </div>
-        )}
+        <Stagger stagger={0.12} delay={0.1}>
+          {logo && <StaggerItem className="mb-6">{logo}</StaggerItem>}
+          <StaggerItem>
+            <h1 className="mt-4 text-balance text-4xl font-bold tracking-tight md:text-5xl">
+              {title}
+            </h1>
+          </StaggerItem>
+          {description && (
+            <StaggerItem>
+              <p className="mt-5 text-base leading-relaxed text-white/70 md:text-lg">
+                {description}
+              </p>
+            </StaggerItem>
+          )}
+          {features.length > 0 && (
+            <Stagger
+              inherit
+              stagger={0.1}
+              className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-3"
+            >
+              {features.map((feature) => (
+                <StaggerItem key={feature.title}>
+                  <FeatureCard feature={feature} />
+                </StaggerItem>
+              ))}
+            </Stagger>
+          )}
+        </Stagger>
       </div>
     </div>
   );

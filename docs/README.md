@@ -14,7 +14,9 @@ This folder is the source of truth for project knowledge: architecture, conventi
 | [frontend/forms.md](frontend/forms.md) | TanStack Form + Zod login pattern (shadcn docs pattern) |
 | [frontend/data.md](frontend/data.md) | Where static content/data lives (`lib/data/`) |
 | [frontend/icons.md](frontend/icons.md) | Icon policy — **HugeIcons only** |
+| [frontend/motion.md](frontend/motion.md) | Animation system (`motion/react`) — primitives, tokens, conventions |
 | [backend/api.md](backend/api.md) | FastAPI stub, auth status (deferred) |
+| [backend/database-schema-design.md](backend/database-schema-design.md) | PostgreSQL schema design guidelines (required workflow for DB work) |
 
 ## Quick commands
 
