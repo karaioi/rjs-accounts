@@ -29,7 +29,7 @@ apps/api/
     │                              #   registration, users, customers,
     │                              #   organizations, members, audit
     ├── services/                  # permissions, audit, verification, rate_limit
-    └── scripts/seed_admin.py
+    └── scripts/                   # seed_admin, render_email_previews
 ```
 
 ## What it does
@@ -52,7 +52,7 @@ All routes are under `/api/v1` and require `Authorization: Bearer <JWT>` — exc
 |---|---|---|---|
 | `GET` | `/me` | authenticated | identity, `platform_role` (raw `neon_auth.user.role`) + `is_platform_admin`, `account_status`, `email_verified`, memberships |
 | `GET` | `/auth/login/verification` | authenticated | current sign-in gate state |
-| `POST` | `/auth/login/verification/start` | authenticated | record that an OTP was requested |
+| `POST` | `/auth/login/verification/start` | authenticated | open (or reopen) the 15-minute code window |
 | `POST` | `/auth/login/verification/complete` | authenticated | confirm the OTP step |
 | `POST` | `/auth/webhooks/neon` | **public — signature** | Neon Auth `send.otp` / `send.magic_link` delivery (see below) |
 | `POST` | `/auth/register` | authenticated | create own `user_profile` in `pending` (idempotent) |
@@ -78,17 +78,20 @@ password-only session gets
 be `active`; a pending/rejected/suspended account gets
 `403 {"detail": "Your account is awaiting administrator approval"}` (header
 `X-Account-Status: pending`). Platform admins must pass the OTP gate but skip the
-approval check.
+approval check. A confirmed OTP stays valid for the life of the session; the
+15-minute `expires_at` bounds only an *unconfirmed* code, and `/start` reopens it
+for a resend or an expired code.
 
 ## Rate limiting
 
 The sign-in gate and registration are rate limited **in FastAPI**
 (`services/rate_limit.py`, counters in `app.rate_limit`); the Managed Auth OTP
-calls are rate limited by the **web auth proxy**. A limited request gets
-`429 {"detail": "Too many attempts. Please wait before trying again."}` with
-`Retry-After` and `X-RateLimit-*` headers, which the relays surface to the
-browser. The routes, windows, and why the policy is split across two layers are
-in [auth-and-tenancy-design.md §13.5](auth-and-tenancy-design.md#135-rate-limiting).
+calls are rate limited by the **web layer** — the auth proxy and the sign-in
+Server Actions share one limiter (`lib/auth/rate-limit.ts`). A limited request
+gets `429 {"detail": "Too many attempts. Please wait before trying again."}`
+with `Retry-After` and `X-RateLimit-*` headers, which the proxy and actions pass
+through to the browser. The routes, windows, and why the policy is split across
+two layers are in [auth-and-tenancy-design.md §13.5](auth-and-tenancy-design.md#135-rate-limiting).
 
 ## Email (OTP + branded templates)
 
@@ -101,13 +104,25 @@ this app renders and sends the mail through `mailer.py`, so it leaves from
   `X-Neon-Signature-Kid`, `X-Neon-Timestamp`) checked against the Neon Auth JWKS;
   deliveries older than 5 minutes and replays of the same event id are rejected.
   Raw-body handling matters — never re-serialize before verifying.
-- **No transport configured → `503`**, so a code is never silently dropped.
+- **No transport configured → `503`; a transport failure → `502`** (auth,
+  connection, provider rejection), so a code is never silently dropped and never
+  surfaces as an unhandled 500. Both are 5xx on purpose: Neon retries the same
+  event id, and the dedup keeps a retry from sending a second code.
   Set `RESEND_API_KEY` + `MAIL_FROM` (or `SMTP_*`) before registering the webhook.
+- **Smoke-testing delivery:** the caller-side call
+  (`POST /email-otp/send-verification-otp`) returns `{"success": true}` even when
+  the webhook is unreachable, so check the tunnel/webhook before blaming the
+  mailer. See [§14.2](auth-and-tenancy-design.md#142-registering-the-webhook).
 - Because the endpoint must be reachable from Neon, local development needs a
-  tunnel: `cloudflared tunnel --url http://localhost:8000` (or `ngrok http 8000)`,
+  tunnel: `cloudflared tunnel --url http://localhost:8000` (or `ngrok http 8000`),
   then point the webhook at `https://<public-host>/api/v1/auth/webhooks/neon`.
+  A quick tunnel gets a **new** hostname on every restart — re-register it.
 - Register it per branch in the Console (Project → Settings → Auth → Webhooks) or
   with `neon neon-auth config webhook update`; the MCP server cannot do it.
+- **Designing the template:** editable HTML snapshots of every message type live
+  in [docs/design/emails/](../../docs/design/emails/README.md) — edit those, then
+  port the result back into `emails.py`. Regenerate with
+  `cd apps/api && uv run render-email-previews`.
 - Full rationale and the exact commands: [auth-and-tenancy-design.md §14](auth-and-tenancy-design.md#14-email-strategy).
 
 ## Local development

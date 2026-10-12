@@ -43,8 +43,12 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { authClient } from "@/lib/auth/client";
-import { describeAuthError, TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
+import {
+  completeSignIn as completeSignInAction,
+  sendSignInCode,
+  startSignIn as startSignInAction,
+  verifyCode,
+} from "@/lib/auth/actions";
 import { consents } from "@/lib/data/consents";
 import { type LoginValues, loginSchema } from "@/lib/validations/login";
 import { otpSchema } from "@/lib/validations/otp";
@@ -92,50 +96,31 @@ export function LoginForm() {
     setPending(true);
 
     try {
-      const { error: signInError } = await authClient.signIn.email({
+      const result = await startSignInAction({
         email: value.email,
         password: value.password,
       });
 
-      if (signInError) {
-        setError(describeAuthError(signInError, "Invalid email or password."));
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
 
-      // The password was accepted. Record the pending second step *before*
-      // asking Managed Auth to deliver the code, so no data is reachable yet.
-      const startResponse = await fetch("/api/verification/start", {
-        method: "POST",
-      });
-      if (startResponse.status === 429) {
-        setError(TOO_MANY_ATTEMPTS);
-        return;
-      }
-
-      const { error: otpError } = await authClient.emailOtp.sendVerificationOtp(
-        {
-          email: value.email,
-          type: "sign-in",
-        },
-      );
-
-      if (otpError) {
-        setError(
-          describeAuthError(otpError, "Could not send the verification code."),
-        );
+      // The session now exists, so the gate can be opened for it. This is a
+      // separate action because Managed Auth reads the session from the
+      // *request*, so a cookie set in the previous action only becomes visible
+      // to the next one.
+      const code = await sendSignInCode({ email: value.email });
+      if (!code.ok) {
+        setError(code.message);
         return;
       }
 
       setEmail(value.email);
       otpForm.reset();
       setStep("otp");
-    } catch (error) {
-      setError(
-        describeAuthError(
-          error,
-          "We couldn't sign you in. Check your connection and try again.",
-        ),
-      );
+    } catch {
+      setError("We couldn't sign you in. Check your connection and try again.");
     } finally {
       setPending(false);
     }
@@ -148,45 +133,25 @@ export function LoginForm() {
     setPending(true);
 
     try {
-      const { error: verifyError } = await authClient.signIn.emailOtp({
-        email,
-        otp,
-      });
-
-      if (verifyError) {
-        setError(describeAuthError(verifyError, "That code is not valid."));
+      const verified = await verifyCode({ email, otp });
+      if (!verified.ok) {
+        setError(verified.message);
         return;
       }
 
-      const gate = await fetch("/api/verification/complete", {
-        method: "POST",
-      });
-      if (gate.status === 429) {
-        setError(TOO_MANY_ATTEMPTS);
+      // Again a separate action: `verifyCode` refreshed the session cookie, and
+      // the backend gate has to be released with that fresh token.
+      const result = await completeSignInAction();
+
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
 
-      // Password + OTP are done. Approval is the remaining gate: a `pending`
-      // account keeps its session but goes to the waiting screen.
-      const accountResponse = await fetch("/api/backend/me");
-      if (accountResponse.ok) {
-        const account = await accountResponse.json();
-        if (!account.is_platform_admin && account.account_status !== "active") {
-          router.push("/pending");
-          router.refresh();
-          return;
-        }
-      }
-
-      router.push("/dashboard");
+      router.push(result.destination);
       router.refresh();
-    } catch (error) {
-      setError(
-        describeAuthError(
-          error,
-          "We couldn't verify that code. Please try again.",
-        ),
-      );
+    } catch {
+      setError("We couldn't verify that code. Please try again.");
     } finally {
       setPending(false);
     }
@@ -198,26 +163,16 @@ export function LoginForm() {
     setPending(true);
 
     try {
-      const { error: otpError } = await authClient.emailOtp.sendVerificationOtp(
-        {
-          email,
-          type: "sign-in",
-        },
-      );
+      const result = await sendSignInCode({ email, resend: true });
 
-      if (otpError) {
-        setError(describeAuthError(otpError, "Could not resend the code."));
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
 
       setNotice("A new code is on its way.");
-    } catch (error) {
-      setError(
-        describeAuthError(
-          error,
-          "We couldn't resend the code. Please try again.",
-        ),
-      );
+    } catch {
+      setError("We couldn't resend the code. Please try again.");
     } finally {
       setPending(false);
     }

@@ -28,8 +28,21 @@ def latest_verification(
     ).scalar_one_or_none()
 
 
-def is_verified(
+def is_verified(row: LoginVerification | None) -> bool:
+    """Whether this sign-in has cleared the email OTP step.
+
+    The confirmation stands for the life of the session: the session token's own
+    expiry (`exp`, enforced when the JWT is verified) is what ends it, so we do
+    not re-impose a second, shorter clock here. `expires_at` bounds only an
+    *unconfirmed* attempt — how long the emailed code stays usable — which
+    `awaiting_code` reports.
+    """
+    return bool(row and row.verified_at is not None)
+
+
+def awaiting_code(
     row: LoginVerification | None, *, now: datetime | None = None
 ) -> bool:
+    """Whether an unconfirmed attempt can still take an emailed code."""
     now = now or datetime.now(UTC)
-    return bool(row and row.verified_at is not None and row.expires_at >= now)
+    return bool(row and row.verified_at is None and row.expires_at >= now)

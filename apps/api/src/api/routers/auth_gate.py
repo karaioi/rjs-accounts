@@ -2,7 +2,7 @@
 
 Managed Better Auth has no native MFA, so the second step is enforced here: a
 newly issued session may call these endpoints (and `/me`), but every data
-endpoint requires a verified, unexpired row in `app.login_verification`.
+endpoint requires a confirmed OTP step in `app.login_verification`.
 
 See docs/backend/auth-and-tenancy-design.md section 13.2.
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth.deps import Principal, get_principal
@@ -19,10 +20,17 @@ from ..db import get_session
 from ..models import LoginVerification
 from ..schemas import LoginVerificationOut
 from ..services.rate_limit import enforce
-from ..services.verification import is_verified, latest_verification
+from ..services.verification import (
+    awaiting_code,
+    is_verified,
+    latest_verification,
+)
 
 router = APIRouter(prefix="/auth/login/verification", tags=["auth"])
 
+#: How long a freshly-sent code stays usable. This bounds only an *unconfirmed*
+#: attempt: once the OTP is confirmed the verification stands for the life of the
+#: session (see `services.verification.is_verified`).
 WINDOW = timedelta(minutes=15)
 
 #: Sign-in OTP limits, matched to `WINDOW`. `start` is one code per password
@@ -54,10 +62,13 @@ def start_verification(
     principal: Principal = Depends(get_principal),
     session: Session = Depends(get_session),
 ) -> LoginVerificationOut:
-    """Record that an OTP was requested for the current sign-in.
+    """Open (or reopen) the OTP window for the current sign-in.
 
     The web client then asks Managed Auth to send the code. Resetting
-    `verified_at` means a brand-new sign-in must complete the OTP step again.
+    `verified_at` means a brand-new sign-in must complete the OTP step again;
+    re-requesting within the same sign-in — a resend, or a code that has already
+    expired — reopens the window in place instead of 500-ing on the
+    `(user_id, session_ref)` key.
     """
     enforce(
         bucket="login.verification.start",
@@ -67,12 +78,26 @@ def start_verification(
     )
 
     now = datetime.now(UTC)
-    row = LoginVerification(
-        user_id=principal.user_id,
-        session_ref=principal.session_ref,
-        expires_at=now + WINDOW,
-    )
-    session.add(row)
+    row = session.execute(
+        select(LoginVerification).where(
+            LoginVerification.user_id == principal.user_id,
+            LoginVerification.session_ref == principal.session_ref,
+        )
+    ).scalar_one_or_none()
+
+    if row is None:
+        row = LoginVerification(
+            user_id=principal.user_id,
+            session_ref=principal.session_ref,
+            otp_sent_at=now,
+            expires_at=now + WINDOW,
+        )
+        session.add(row)
+    else:
+        row.otp_sent_at = now
+        row.verified_at = None
+        row.expires_at = now + WINDOW
+
     session.commit()
     session.refresh(row)
     return _status(row)
@@ -93,7 +118,7 @@ def complete_verification(
 
     now = datetime.now(UTC)
     row = latest_verification(session, principal.user_id)
-    if row is None or row.expires_at < now:
+    if not awaiting_code(row, now=now):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Start verification before completing it",

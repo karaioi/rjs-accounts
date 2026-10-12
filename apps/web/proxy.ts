@@ -9,13 +9,14 @@ import { auth } from "@/lib/auth/server";
  * Two jobs:
  *  1. `/dashboard` and `/admin` need a session — the Managed Auth middleware
  *     sends anonymous visitors to `/login` and refreshes the session cookies.
- *  2. `/login` and `/sign-up` are hidden from anyone already signed in: they are
- *     sent to `/dashboard` and stay there until they sign out.
+ *  2. `/login` and `/sign-up` are hidden from anyone who has *finished* signing
+ *     in: they are sent to `/dashboard` and stay there until they sign out.
  *
- * The one exception is the sign-in OTP step, which lives on `/login` itself. A
- * visitor who has just passed the password step is *not* signed in yet, so the
- * redirect stands aside until that step is done — otherwise a reload would
- * strand them on a dashboard whose data endpoints are still gated.
+ * "Finished" is the whole two-step sign-in, not just the password step. A
+ * session whose email-OTP step is unconfirmed — whether the code window is still
+ * open or has already closed — keeps `/login`, so the code can be entered or a
+ * fresh one requested. Treating it as signed in would strand it on a workspace
+ * whose data endpoints the backend still rejects (403 `X-Login-Verification`).
  */
 
 /** Managed Auth's middleware: session required, cookies refreshed. */
@@ -34,8 +35,9 @@ function isAuthEntry(pathname: string): boolean {
  * Whether this request carries a session that has finished signing in.
  *
  * Cheap first: no session cookie at all means no need to ask anyone. Only then
- * do we ask the backend for the sign-in gate, because the OTP step is part of
- * signing in — a pending, unexpired code means the visitor is still on `/login`.
+ * do we ask the backend (its verdict is authoritative, and the backend is what
+ * actually rejects a half-finished sign-in) — a session counts as signed in only
+ * once the email-OTP step is confirmed.
  */
 async function isSignedIn(request: NextRequest): Promise<boolean> {
   const cookie = request.headers.get("cookie") ?? "";
@@ -53,20 +55,8 @@ async function isSignedIn(request: NextRequest): Promise<boolean> {
       return false;
     }
 
-    const gate: { verified?: boolean; expires_at?: string | null } =
-      await response.json();
-
-    if (gate.verified) {
-      return true;
-    }
-
-    // Mid sign-in: the code was requested and its window is still open, so the
-    // visitor belongs on /login to type it in.
-    const awaitingCode = gate.expires_at
-      ? new Date(gate.expires_at).getTime() > Date.now()
-      : false;
-
-    return !awaitingCode;
+    const gate: { verified?: boolean } = await response.json();
+    return gate.verified === true;
   } catch {
     // Never trap a visitor on an auth page because a check failed.
     return false;

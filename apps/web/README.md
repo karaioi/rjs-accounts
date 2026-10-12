@@ -45,10 +45,9 @@ app/
   (application)/dashboard/     # stub (guards approval + admin link)
   (application)/admin/users/   # platform-admin approval queue
   api/auth/[...path]/   # Neon Auth proxy
-  api/backend/[...path]/ # same-origin relay → FastAPI
-  api/verification/     # sign-in gate relay
+  api/verification/     # sign-in gate read (used by proxy.ts)
 components/             # app components (auth shell/message, motion, …) + ui/
-lib/                    # api client, auth clients, data, validations
+lib/                    # api client + Server Actions, auth clients/actions, data, validations
 ```
 
 Route protection lives in `proxy.ts` (Next 16 middleware).

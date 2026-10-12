@@ -131,6 +131,14 @@ class AuditLogOut(BaseModel):
 
 
 class LoginVerificationOut(BaseModel):
+    """State of the second sign-in step (the emailed OTP).
+
+    `expires_at` is when the *unconfirmed* code window closes, and is `None`
+    until a code has been requested. A confirmed sign-in (`verified`) stays valid
+    for the life of the session, so `expires_at` can be in the past while
+    `verified` is still true.
+    """
+
     required: bool
     verified: bool
     expires_at: datetime | None = None

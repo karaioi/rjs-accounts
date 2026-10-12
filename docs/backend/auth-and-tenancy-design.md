@@ -405,6 +405,19 @@ using (
 - Authorization is enforced **server-side**, never by hiding UI.
 - DB credentials never reach the browser; only `NEON_AUTH_BASE_URL` is browser-facing (through the same-origin proxy).
 - Platform admins are the only cross-tenant actors, and that is a single, auditable code path.
+- An email that cannot be sent is reported as an error, never silently accepted.
+
+### 11.5 Credentials & transport
+
+Sign-in credentials are always visible in the **submitter's own** DevTools Network tab — that is how a password reaches a server and is true of every site; it is not an exposure. What matters is what happens to them in transit and at rest:
+
+- **HTTPS everywhere in production.** The password travels in the request **body** — never the URL, query string, or a header — so it never lands in access logs, browser history, or `Referer`; TLS is what keeps it off the wire. `http://localhost` is fine because loopback never leaves the machine, but plain `http://` on a real domain is a **P1 defect** (credentials are readable on the wire).
+- **No browser-callable proxy to the API.** The web app exposes *named* Server Actions (`lib/auth/actions.ts`, `lib/api/actions.ts`) for each operation the browser performs — there is no catch-all relay. This is deliberate. A generic `[...path]` proxy that forwards an arbitrary path, method, and body is a payload-shaping primitive, and it can be walked out of its own prefix: Next decodes `%2f` **before** the route handler sees the segments, so a request to `/api/backend/..%2f..%2fhealth` reached FastAPI's `/health`, outside `/api/v1`. Named actions cannot be aimed anywhere else. If a catch-all relay is ever reintroduced, validate every segment as a plain path element (`[A-Za-z0-9._~-]+`, and never `.` or `..`) before building the upstream URL.
+- **Server Actions instead of extra routes.** The sign-in steps are Server Actions, so the browser calls a function rather than a URL and Next.js applies its own Origin check to each call. One property of Managed Auth to keep in mind: it reads the session from the **incoming request's** cookies, so a session it sets inside an action is only visible to `auth.token()` on the *next* request — which is why opening the backend gate and releasing it are separate actions.
+- **Never log bodies or credentials.** The same-origin Managed Auth proxy (`app/api/auth/[...path]`) and the sign-in Server Actions forward requests without body logging, and the API's access log records method + path only. Keep it that way: never `console.log` a request body, and never enable cloudflared's `--loglevel debug` against production (it logs headers).
+- **The browser never holds a secret.** The browser talks only to same-origin Next.js routes and Server Actions; the FastAPI base URL and the bearer token stay server-side (`lib/api/server.ts` attaches the token).
+- **Session cookies are `HttpOnly`, `Secure`, `SameSite=Lax`** (set by `@neondatabase/auth`), so page JavaScript cannot read the session and a stolen cookie is not reachable from XSS.
+- **Passwords are only ever hashed by Neon Auth.** Nothing in `apps/api` sees, stores, or logs a password.
 
 ---
 
@@ -455,10 +468,10 @@ Managed Auth has **no MFA/2FA** (it is on their roadmap; see [§17](#17-risks--l
 
 - The OTP itself is **sent and validated by Managed Auth** (no custom OTP infrastructure).
 - The **gate lives in FastAPI**: a session that never completes the OTP step can authenticate but cannot read or write data.
-- The verification record is **per user** (the latest row wins) and expires with the session window. It is keyed on the user rather than the session because completing the OTP step makes Managed Auth issue a fresh token; `session_ref` is stored for traceability.
+- The verification record is **per user** (the latest row wins). `expires_at` bounds only an *unconfirmed* attempt — how long the emailed code stays usable (15 minutes); `POST /auth/login/verification/start` reopens that window for a resend or an expired code. Once the code is confirmed the verification stands for the life of the session: the session token's own expiry (checked when the JWT is verified) is what ends it, so a normal signed-in session is *not* re-challenged every 15 minutes. It is keyed on the user rather than the session because completing the OTP step makes Managed Auth issue a fresh token; `session_ref` is stored for traceability.
 - OTP-only sign-in (without the password step) remains available.
 - The gate also enforces **account approval**: a `pending`/`rejected`/`suspended` account that *has* passed the OTP step gets `403` with `X-Account-Status` until an administrator activates it. `/me`, `/auth/register`, and `/auth/login/verification/*` use `get_principal` directly so a not-yet-approved user can still bootstrap and see their own state.
-- **The web app mirrors the gate in routing.** `apps/web/proxy.ts` calls a visitor signed in only when they hold a session *and* are not mid-OTP: `/login` and `/sign-up` redirect to `/dashboard` for anyone already signed in (sign out to get them back), while a half-finished sign-in keeps `/login` so it can type the code that is waiting. The check reads `GET /api/v1/auth/login/verification` through the same-origin `/api/verification` relay, and skips the lookup entirely when no session cookie is present. `/pending` is deliberately not redirected — an unapproved account belongs there.
+- **The web app mirrors the gate in routing.** `apps/web/proxy.ts` calls a visitor signed in only when the backend reports the OTP step **confirmed**: `/login` and `/sign-up` redirect to `/dashboard` for a finished sign-in, while a session that is mid-OTP — including one whose code window has already closed — keeps `/login`, so a fresh code can be entered or requested. Gated pages go the same way: `/admin/users` sends a `403` carrying `X-Login-Verification: required` back to `/login` instead of rendering behind a closed gate. The check reads `GET /api/v1/auth/login/verification` through the same-origin `/api/verification` relay, and skips the lookup entirely when no session cookie is present. `/pending` is deliberately not redirected — an unapproved account belongs there.
 
 ### 13.3 Password reset
 
@@ -555,8 +568,9 @@ The webhook lives on the FastAPI service and needs a **public HTTPS URL** — in
 
 ```bash
 # Console: Project → Settings → Auth → Webhooks → Add
-#   URL:    https://<public-host>/api/v1/auth/webhooks/neon
-#   Events: send.otp, send.magic_link
+#   URL:     https://<public-host>/api/v1/auth/webhooks/neon
+#   Events:  send.otp, send.magic_link
+#   Timeout: 10s (the maximum) — must exceed the mailer's budget, see below
 
 # …or with the Neon CLI (--enabled is required; --url must be the full path):
 neon neon-auth config webhook get
@@ -564,14 +578,21 @@ neon neon-auth config webhook update \
   --project-id fancy-union-18717305 --branch production \
   --enabled \
   --url https://<public-host>/api/v1/auth/webhooks/neon \
-  --enabled-events send.otp send.magic_link
+  --enabled-events send.otp send.magic_link \
+  --timeout 10
 ```
 
-**Current state (Oct 2026).** The `production` branch has the webhook **enabled** for `send.otp` + `send.magic_link`, pointing at a Cloudflare **quick tunnel** to the local API (`cloudflared tunnel --url http://localhost:8000` → an ephemeral `https://<name>.trycloudflare.com`).
+**Current state (Oct 2026).** The `production` branch has the webhook **enabled** for `send.otp` + `send.magic_link` with a **10s** timeout, pointing at a Cloudflare **quick tunnel** to the local API (`cloudflared tunnel --url http://localhost:8000` → an ephemeral `https://<name>.trycloudflare.com`). The mailer sends through **Gmail SMTP** from `RJS Accounts <team.rjsconsultancy@gmail.com>` (`SMTP_PASSWORD` = a Google app password); a sign-in OTP has been exercised end-to-end (webhook delivered to the API, and the API handed the message to Gmail).
 
-- The tunnel URL exists only while that process runs and **changes on every restart**, so re-run `webhook update --url …` after restarting the tunnel. Read the live value any time with `neon neon-auth config webhook get`.
-- If the tunnel is down, Neon's webhook delivery fails and the code is not sent (Neon retries); the branch falls back to nothing until the URL is restored.
-- Verified end-to-end: a sign-in OTP arrived rendered by `emails.py` with Resend `last_event: delivered` (Resend was the transport then). The mailer is now configured for **Gmail SMTP**, sending from `RJS Accounts <team.rjsconsultancy@gmail.com>`; it needs a Google **app password** in `SMTP_PASSWORD` before that transport can authenticate.
+- The tunnel URL exists only while that process runs and **changes on every restart**, so re-run `webhook update --url …` after restarting the tunnel. Read the live value any time with `neon neon-auth config webhook get`, or from the tunnel's own metrics endpoint: `curl http://127.0.0.1:<metrics-port>/quicktunnel`.
+- **Delivery failure is silent at the call site.** Neon Auth treats the webhook as fire-and-forget: `POST /email-otp/send-verification-otp` answers `{"success": true}` **even when the webhook is unreachable**. "success" means "Neon accepted the request", not "the code was delivered" — so never diagnose an OTP problem from that response. Check, in order:
+  1. `curl http://127.0.0.1:<metrics-port>/ready` → expect `readyConnections: 1`; `0` means the tunnel is down.
+  2. The registered URL matches the tunnel's **current** hostname (`webhook get`).
+  3. `curl -X POST https://<host>/api/v1/auth/webhooks/neon -d '{}'` → a live endpoint answers **401** (`Missing webhook signature headers`); a dead one never responds at all.
+  4. `uv run python -c "from api.mailer import send_email; print(send_email(to='…', subject='probe', body='probe'))"` → isolates the mailer from the tunnel.
+  If delivery reaches the endpoint and the mailer returns `True`, a missing message is a **provider** matter — Gmail will accept a message and still file it under Spam/Promotions.
+- **Keep the mailer budget inside the webhook timeout.** `mailer.DELIVERY_TIMEOUT_SECONDS` is **8s** against the webhook's 10s. If the provider takes longer than Neon's timeout, Neon gives up and retries the *same* event id while the first attempt is still in flight; the in-memory dedup cannot help mid-flight, so the user can receive **two codes**. A Gmail SMTP handshake costs ~5s, which is why the timeout was raised from Neon's 5s default.
+- A transport failure is a **502** and "no transport configured" is a **503** (`mailer.MailDeliveryError` → `_send` in `auth_webhooks.py`) — never a 500 traceback, and never a 2xx that hides a dropped code. Neon retries both.
 
 There is no MCP tool for webhooks or the email provider — use the Console, the CLI, or the Neon REST API.
 
@@ -654,7 +675,7 @@ The login-verification gate (`otp_required`) and the account-approval gate apply
 
 ### Environment
 
-`apps/web/.env.local` (see `.env.example`) — the `NEON_AUTH_BASE_URL` and `NEON_AUTH_COOKIE_SECRET` values, plus `API_BASE_URL` (the FastAPI origin, used **server-side only** in the route handlers/relay, so no `NEXT_PUBLIC_` prefix). Generate the cookie secret with `openssl rand -base64 32`. The web app holds **auth values + the API base URL only** — never DB or storage credentials (those belong to `apps/api`).
+`apps/web/.env.local` (see `.env.example`) — the `NEON_AUTH_BASE_URL` and `NEON_AUTH_COOKIE_SECRET` values, plus `API_BASE_URL` (the FastAPI origin, used **server-side only** in route handlers and Server Actions, so no `NEXT_PUBLIC_` prefix). Generate the cookie secret with `openssl rand -base64 32`. The web app holds **auth values + the API base URL only** — never DB or storage credentials (those belong to `apps/api`).
 
 `apps/api/.env` — `HOST` and `PORT` (the local dev bind address), `DATABASE_URL` (pooled), `DATABASE_URL_UNPOOLED` (direct, migrations), `NEON_AUTH_JWKS_URL`, `NEON_AUTH_BASE_URL`, `ENVIRONMENT`, `CORS_ORIGINS` (must include the web origin, e.g. `["http://localhost:3000"]`), `APP_NAME` (branding in emails), and the mailer settings (`MAIL_PROVIDER`, `MAIL_FROM`, plus the transport credentials — `SMTP_*` for Gmail/Resend SMTP, or `RESEND_API_KEY` for the Resend HTTP API). The mailer is production-critical now that it delivers the sign-in OTP ([§14.1](#141-otp-delivery-runs-through-our-mailer-neon-auth-webhooks)), so a transport and `MAIL_FROM` must be set wherever the webhook is registered. Until the `app_runtime` role exists ([§17](#17-risks--limitations) risk 6) both URLs use the owner role: RLS is in place but bypassed by the owner, so **the API layer is what enforces tenancy today**.
 
@@ -689,7 +710,9 @@ uv run seed-admin someone@example.com # grant platform admin
 |---|---|
 | Auth client/server (web) | `apps/web/lib/auth/` |
 | Auth proxy route | `apps/web/app/api/auth/[...path]/route.ts` |
-| Same-origin relay → FastAPI | `apps/web/app/api/backend/[...path]/route.ts` |
+| Sign-in Server Actions | `apps/web/lib/auth/actions.ts` |
+| Backend Server Actions (register, approvals) | `apps/web/lib/api/actions.ts` |
+| Sign-in gate read (for `proxy.ts`) | `apps/web/app/api/verification/route.ts` |
 | Auth screens (login / sign-up / pending) | `apps/web/app/(login)/` |
 | Admin approval queue | `apps/web/app/(application)/admin/users/` |
 | Route protection + auth-page redirects | `apps/web/proxy.ts` (Next 16 middleware) |

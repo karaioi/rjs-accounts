@@ -13,6 +13,7 @@ import { useState } from "react";
 import { FormMessage } from "@/components/auth-message";
 import { Reveal } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
+import { decideUser } from "@/lib/api/actions";
 import {
   Card,
   CardContent,
@@ -36,13 +37,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
-export function AdminUsers({
-  users,
-  gateRequired = false,
-}: {
-  users: PendingUser[] | null;
-  gateRequired?: boolean;
-}) {
+export function AdminUsers({ users }: { users: PendingUser[] | null }) {
   const router = useRouter();
   const [queue, setQueue] = useState<PendingUser[]>(users ?? []);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -53,17 +48,13 @@ export function AdminUsers({
     setBusyId(user.user_id);
 
     try {
-      const response = await fetch(
-        `/api/backend/users/${user.user_id}/${action}`,
-        { method: "POST" },
-      );
+      const result = await decideUser({
+        userId: user.user_id,
+        decision: action,
+      });
 
-      if (!response.ok) {
-        setError(
-          action === "approve"
-            ? "Could not approve that account. Please try again."
-            : "Could not decline that account. Please try again.",
-        );
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
 
@@ -102,13 +93,6 @@ export function AdminUsers({
           </CardHeader>
 
           <CardContent className="flex flex-col gap-4">
-            {gateRequired && (
-              <FormMessage tone="error">
-                Your sign-in is missing its email-verification step. Sign in
-                again before reviewing accounts.
-              </FormMessage>
-            )}
-
             {error && <FormMessage tone="error">{error}</FormMessage>}
 
             {queue.length === 0 ? (

@@ -21,8 +21,23 @@ from .config import Settings, get_settings
 
 logger = logging.getLogger("api.mailer")
 
+
+class MailDeliveryError(RuntimeError):
+    """The configured transport could not hand the message to its provider.
+
+    Callers translate this into a 5xx so a webhook source (Neon Auth) retries
+    the delivery instead of seeing an unhandled traceback.
+    """
+
+
 # Resend's fixed HTTP API endpoint. A provider constant, not environment config.
 RESEND_API_URL = "https://api.resend.com/emails"
+
+#: How long one delivery attempt may take. Kept under Neon Auth's webhook
+#: timeout (set to 10s, the maximum it allows) so a stalling provider fails here
+#: and answers 5xx — which Neon retries with the same event id — rather than
+#: Neon giving up first and retrying while our send is still in flight.
+DELIVERY_TIMEOUT_SECONDS = 8
 
 
 def send_email(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
@@ -90,13 +105,16 @@ def _send_resend(
     if html:
         payload["html"] = html
 
-    response = httpx.post(
-        RESEND_API_URL,
-        headers={"Authorization": f"Bearer {settings.resend_api_key}"},
-        json=payload,
-        timeout=15,
-    )
-    response.raise_for_status()
+    try:
+        response = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+            json=payload,
+            timeout=DELIVERY_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise MailDeliveryError(f"Resend delivery failed: {exc}") from exc
     return True
 
 
@@ -116,13 +134,18 @@ def _send_smtp(
     if html:
         message.add_alternative(html, subtype="html")
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
-        smtp.ehlo()
-        if settings.smtp_use_tls:
-            smtp.starttls()
+    try:
+        with smtplib.SMTP(
+            settings.smtp_host, settings.smtp_port, timeout=DELIVERY_TIMEOUT_SECONDS
+        ) as smtp:
             smtp.ehlo()
-        if settings.smtp_user:
-            smtp.login(settings.smtp_user, settings.smtp_password or "")
-        smtp.send_message(message)
+            if settings.smtp_use_tls:
+                smtp.starttls()
+                smtp.ehlo()
+            if settings.smtp_user:
+                smtp.login(settings.smtp_user, settings.smtp_password or "")
+            smtp.send_message(message)
+    except (OSError, smtplib.SMTPException) as exc:
+        raise MailDeliveryError(f"SMTP delivery failed: {exc}") from exc
 
     return True

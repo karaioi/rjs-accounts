@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from ..auth.webhooks import WebhookVerifier, get_webhook_verifier
 from ..config import get_settings
 from ..emails import Email, render_magic_link_email, render_otp_email
-from ..mailer import send_email
+from ..mailer import MailDeliveryError, send_email
 
 logger = logging.getLogger("api.auth_webhooks")
 
@@ -118,8 +118,23 @@ def _deliver_magic_link(payload: dict[str, Any]) -> None:
 
 
 def _send(*, to: str, message: Email) -> None:
-    if send_email(to=to, subject=message.subject, body=message.text, html=message.html):
+    try:
+        delivered = send_email(
+            to=to, subject=message.subject, body=message.text, html=message.html
+        )
+    except MailDeliveryError as exc:
+        # The transport failed (auth, connection, provider rejection). A 5xx is
+        # deliberate: Neon retries with the same event id, which the dedup above
+        # keeps from sending a second code.
+        logger.error("[auth-webhook] delivery to %s failed: %s", to, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Email delivery failed",
+        ) from exc
+
+    if delivered:
         return
+
     # `send_email` returns False when no transport is configured (the "log"
     # provider). An undelivered code is a broken sign-in, so surface it instead
     # of answering 2xx and leaving the user waiting for an email that never comes.

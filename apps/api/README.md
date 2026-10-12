@@ -25,3 +25,14 @@ pnpm dev                                      # or: from the repo root, starts
 ```
 
 Docs at <http://127.0.0.1:8000/docs>.
+
+## Email templates
+
+The branded OTP / magic-link emails are rendered by `src/api/emails.py`. To
+design them as editable HTML, render snapshots into `docs/design/emails/`:
+
+```sh
+uv run render-email-previews
+```
+
+See [`docs/design/emails/README.md`](../../docs/design/emails/README.md).

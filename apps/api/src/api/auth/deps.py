@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -137,7 +136,9 @@ def require_verified_login(
     Two independent conditions must hold before a caller may read or change data:
 
     1. the two-step sign-in gate — a freshly issued session cannot act until the
-       email OTP step has been confirmed (see auth-and-tenancy-design.md §13.2);
+       email OTP step has been confirmed (see auth-and-tenancy-design.md §13.2).
+       The confirmation lasts as long as the session itself, so a signed-in user
+       is not re-challenged on a shorter clock;
     2. account approval — a self-service sign-up stays `pending` until a platform
        admin activates it.
 
@@ -147,7 +148,7 @@ def require_verified_login(
     """
     row = latest_verification(session, principal.user_id)
 
-    if not is_verified(row, now=datetime.now(UTC)):
+    if not is_verified(row):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email verification required",

@@ -37,8 +37,7 @@ app/
   (application)/dashboard/  # "Your access" summary (identity + roles) + admin link
   (application)/admin/users/  # platform-admin approval queue
   api/auth/[...path]/       # Neon Auth proxy route (+ rate limiting for auth calls)
-  api/backend/[...path]/    # same-origin relay → FastAPI (/api/v1/*)
-  api/verification/         # sign-in gate relay (GET/start/complete)
+  api/verification/         # sign-in gate read, used by proxy.ts
   layout.tsx, globals.css, shadcn.css
 proxy.ts                    # route protection + auth-page redirects (Next 16 middleware)
 components/
@@ -56,8 +55,9 @@ components/
   ui/                # shadcn registry components (base-ui)
 lib/
   api/server.ts      # server-side fetch → FastAPI (attaches bearer token)
+  api/actions.ts     # Server Actions for browser-driven backend calls
   api/types.ts       # response shapes consumed from FastAPI (e.g. MeResponse)
-  auth/              # Neon Auth server + browser clients, auth-call rate limits
+  auth/              # Neon Auth server + browser clients, sign-in actions, rate limits
   data/              # static content (promo, consents, roles)
   rate-limit.ts      # in-process fixed-window limiter
   utils.ts

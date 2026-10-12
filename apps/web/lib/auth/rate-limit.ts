@@ -30,6 +30,11 @@ type Policy = {
   subject?: RateLimitRule;
 };
 
+/** The verdict for one operation: through, or blocked with a wait. */
+export type AuthRateLimitCheck =
+  | { allowed: true }
+  | { allowed: false; retryAfterSeconds: number };
+
 /** Keyed by the path after `/api/auth/`. */
 const POLICIES: Record<string, Policy> = {
   "sign-in/email": {
@@ -78,6 +83,41 @@ async function bodyEmail(request: Request): Promise<string | null> {
 }
 
 /**
+ * Consume the budget for one named Managed Auth operation.
+ *
+ * Shared by the `/api/auth/[...path]` proxy, which reads the caller and the
+ * subject from the `Request`, and by the sign-in Server Actions, which have no
+ * `Request` to read (see `lib/auth/actions.ts`).
+ */
+export function checkAuthRateLimit(input: {
+  path: string;
+  ip: string;
+  email?: string | null;
+}): AuthRateLimitCheck {
+  const policy = POLICIES[input.path];
+  if (!policy) {
+    return { allowed: true };
+  }
+
+  const now = Date.now();
+  const decisions = [
+    consume(`auth:${input.path}:ip:${input.ip}`, policy.ip, now),
+  ];
+
+  if (policy.subject && input.email) {
+    decisions.push(
+      consume(`auth:${input.path}:email:${input.email}`, policy.subject, now),
+    );
+  }
+
+  const blocked = decisions.find((decision) => !decision.allowed);
+  if (!blocked || blocked.allowed) {
+    return { allowed: true };
+  }
+  return { allowed: false, retryAfterSeconds: blocked.retryAfterSeconds };
+}
+
+/**
  * Consume the rate-limit budget for this request.
  *
  * Returns a `429` response to send back when a limit is exceeded, or `null` to
@@ -87,27 +127,16 @@ export async function enforceAuthRateLimit(
   request: Request,
 ): Promise<NextResponse | null> {
   const path = new URL(request.url).pathname.replace(/^\/api\/auth\/?/, "");
-  const policy = POLICIES[path];
-  if (!policy) {
+  if (!POLICIES[path]) {
     return null;
   }
 
-  const now = Date.now();
-  const decisions = [
-    consume(`auth:${path}:ip:${clientIp(request)}`, policy.ip, now),
-  ];
-
-  if (policy.subject) {
-    const email = await bodyEmail(request);
-    if (email) {
-      decisions.push(
-        consume(`auth:${path}:email:${email}`, policy.subject, now),
-      );
-    }
-  }
-
-  const blocked = decisions.find((decision) => !decision.allowed);
-  if (!blocked || blocked.allowed) {
+  const decision = checkAuthRateLimit({
+    path,
+    ip: clientIp(request),
+    email: await bodyEmail(request),
+  });
+  if (decision.allowed) {
     return null;
   }
 
@@ -120,7 +149,7 @@ export async function enforceAuthRateLimit(
     },
     {
       status: 429,
-      headers: { "Retry-After": String(blocked.retryAfterSeconds) },
+      headers: { "Retry-After": String(decision.retryAfterSeconds) },
     },
   );
 }
