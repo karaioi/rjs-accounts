@@ -1,0 +1,218 @@
+<!doctype html>
+<!--
+  Design index for the transactional emails. Not a runtime asset.
+  Open this file directly in a browser from docs/design/emails/.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RJS Accounts — email design</title>
+    <style>
+      :root {
+        --brand-green: #2d803d;
+        --brand-blue: #2b66a9;
+        --bright-green: #3aa64f;
+        --charcoal: #1e2025;
+        --ink: #0f172a;
+        --body-text: #475569;
+        --muted: #64748b;
+        --card: #ffffff;
+        --page: #f4f5f7;
+        --hairline: rgba(15, 23, 42, 0.1);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 40px 20px 72px;
+        background: var(--page);
+        color: var(--ink);
+        font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 24px;
+        letter-spacing: -0.3px;
+      }
+      .lede {
+        margin: 0 0 28px;
+        color: var(--muted);
+      }
+      .bar {
+        height: 4px;
+        border-radius: 999px;
+        background-image: linear-gradient(
+          90deg,
+          var(--brand-green) 0%,
+          var(--brand-blue) 100%
+        );
+        margin: 0 0 28px;
+      }
+      h2 {
+        margin: 32px 0 12px;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
+      a.item {
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        padding: 16px 18px;
+        background: var(--card);
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        text-decoration: none;
+        color: inherit;
+      }
+      a.item:hover {
+        border-color: var(--brand-blue);
+      }
+      a.item .name {
+        font-weight: 600;
+        color: var(--brand-blue);
+      }
+      a.item .desc {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 12px;
+      }
+      .swatch {
+        border: 1px solid var(--hairline);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--card);
+      }
+      .swatch .chip {
+        height: 56px;
+      }
+      .swatch .meta {
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .swatch .meta code {
+        color: var(--ink);
+      }
+      footer {
+        margin-top: 40px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="bar"></div>
+      <h1>Email design</h1>
+      <p class="lede">
+        Snapshots rendered from
+        <code>apps/api/src/api/emails.py</code>. Edit the individual files, then
+        have the design ported back into the template. See
+        <code>README.md</code> in this folder.
+      </p>
+
+      <h2>Previews</h2>
+      <ul>
+        <li>
+          <a class="item" href="otp-sign-in.html">
+            <span class="name">otp-sign-in.html</span>
+            <span class="desc">Sign-in code, after the password step</span>
+          </a>
+        </li>
+        <li>
+          <a class="item" href="otp-verify-email.html">
+            <span class="name">otp-verify-email.html</span>
+            <span class="desc">Sign-up email verification</span>
+          </a>
+        </li>
+        <li>
+          <a class="item" href="otp-reset-password.html">
+            <span class="name">otp-reset-password.html</span>
+            <span class="desc">Password reset code</span>
+          </a>
+        </li>
+        <li>
+          <a class="item" href="magic-link-sign-in.html">
+            <span class="name">magic-link-sign-in.html</span>
+            <span class="desc">Magic-link sign-in</span>
+          </a>
+        </li>
+        <li>
+          <a class="item" href="magic-link-reset-password.html">
+            <span class="name">magic-link-reset-password.html</span>
+            <span class="desc">Password reset link</span>
+          </a>
+        </li>
+      </ul>
+
+      <h2>Palette</h2>
+      <div class="swatches">
+        <div class="swatch">
+          <div class="chip" style="background: var(--page)"></div>
+          <div class="meta">page <code>#f4f5f7</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--card)"></div>
+          <div class="meta">card <code>#ffffff</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--charcoal)"></div>
+          <div class="meta">charcoal <code>#1e2025</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--ink)"></div>
+          <div class="meta">ink <code>#0f172a</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--body-text)"></div>
+          <div class="meta">body <code>#475569</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--muted)"></div>
+          <div class="meta">muted <code>#64748b</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-green)"></div>
+          <div class="meta">brand-green <code>#2d803d</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--brand-blue)"></div>
+          <div class="meta">brand-blue <code>#2b66a9</code></div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: var(--bright-green)"></div>
+          <div class="meta">bright-green <code>#3aa64f</code></div>
+        </div>
+      </div>
+
+      <footer>
+        <code>index.html</code> is a design index only — it is not a route and is
+        never served. Regenerate the previews with
+        <code>cd apps/api &amp;&amp; uv run render-email-previews</code>.
+      </footer>
+    </main>
+  </body>
+</html>
