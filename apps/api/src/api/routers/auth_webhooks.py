@@ -81,6 +81,7 @@ async def neon_auth_webhook(
 
 def _deliver_otp(payload: dict[str, Any]) -> None:
     """Send the verification code with our own template."""
+    settings = get_settings()
     user = payload.get("user") or {}
     data = payload.get("event_data") or {}
 
@@ -88,7 +89,8 @@ def _deliver_otp(payload: dict[str, Any]) -> None:
     code = _require(data, "otp_code", event="send.otp")
 
     message = render_otp_email(
-        app_name=get_settings().app_name,
+        app_name=settings.app_name,
+        app_url=settings.app_url,
         code=str(code),
         otp_type=str(data.get("otp_type") or ""),
         to=to,
@@ -100,6 +102,7 @@ def _deliver_otp(payload: dict[str, Any]) -> None:
 
 def _deliver_magic_link(payload: dict[str, Any]) -> None:
     """Send a magic link (or password-reset link) with our own template."""
+    settings = get_settings()
     user = payload.get("user") or {}
     data = payload.get("event_data") or {}
 
@@ -107,7 +110,8 @@ def _deliver_magic_link(payload: dict[str, Any]) -> None:
     link_url = _require(data, "link_url", event="send.magic_link")
 
     message = render_magic_link_email(
-        app_name=get_settings().app_name,
+        app_name=settings.app_name,
+        app_url=settings.app_url,
         link_url=str(link_url),
         link_type=str(data.get("link_type") or ""),
         to=to,

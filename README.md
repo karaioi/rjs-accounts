@@ -43,7 +43,7 @@ pnpm install
 Fill in the environment files:
 
 - `apps/web/.env.local` — copy `apps/web/.env.example` (`NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `API_BASE_URL`). Take the base URL from `neon neon-auth status`; generate the cookie secret with `openssl rand -base64 32`.
-- `apps/api/.env` — copy `apps/api/.env.example` (`HOST`/`PORT`, `DATABASE_URL*`, `NEON_AUTH_*`, `APP_NAME`, mailer: `MAIL_PROVIDER`/`MAIL_FROM`/`SMTP_*`). Pull the branch database + Auth values straight in with `neon env pull --service postgres,auth --file apps/api/.env`.
+- `apps/api/.env` — copy `apps/api/.env.example` (`HOST`/`PORT`, `DATABASE_URL*`, `NEON_AUTH_*`, `APP_NAME` (and optional `APP_URL`), mailer: `MAIL_PROVIDER`/`MAIL_FROM`/`SMTP_*`). Pull the branch database + Auth values straight in with `neon env pull --service postgres,auth --file apps/api/.env`.
 
 Every variable is required and read from the environment — neither app has in-code
 defaults, so a missing value fails fast instead of falling back to a dev value.

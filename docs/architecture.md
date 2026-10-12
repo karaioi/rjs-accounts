@@ -30,6 +30,7 @@
 
 ```
 app/
+  page.tsx                  # `/` → redirects to /dashboard
   (login)/login/            # two-step sign-in (password → email OTP)
   (login)/sign-up/          # self-service sign-up (email-verified → pending)
   (login)/pending/          # "awaiting approval" screen
@@ -77,11 +78,13 @@ listener fails with `EADDRINUSE`. To run only the API: `cd apps/api && uv run ap
 ## Neon configuration
 
 - **`.neon`** — the project link (`neon link`) that pins the branch; `neon` commands run against it.
-- **`neon.ts`** (root) — declarative Neon policy via `@neon/config/v1`: `auth: true` (Managed Better Auth) and an `uploads` object-storage bucket (`access: "private"`). Edit this file, then reconcile a branch:
+- **`neon.ts`** (root) — declarative Neon policy via `@neon/config/v1`: `auth: true` (Managed Better Auth) and two object-storage buckets — `uploads` (`access: "private"`, for user content) and `public-assets` (`access: "public_read"`, for branding assets that load without a credential, e.g. the email logo). Edit this file, then reconcile a branch:
 
   ```sh
   neon config plan     # dry run: show the diff for the linked branch
-  neon config apply    # apply the policy
+  neon config apply    # apply the policy (alias: neon deploy)
   ```
 
+  Uploading an object: `neon buckets object put public-assets/brand/<name> --file <path> --content-type image/png`.
+  A `public_read` object is served anonymously at `${AWS_ENDPOINT_URL_S3}/<bucket>/<key>` (the endpoint is branch-scoped — see the production URL in [design/emails/README.md](design/emails/README.md#hosted-assets)).
 - The **Neon CLI** (`neon@8.x`) is installed globally with pnpm. `pnpm setup` (once per machine) puts `PNPM_HOME` (`~/Library/pnpm` on macOS) on `PATH` so the `neon` command resolves in new shells; reload with `source ~/.zshrc`.

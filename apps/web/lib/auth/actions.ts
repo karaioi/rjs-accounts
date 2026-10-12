@@ -102,9 +102,14 @@ export async function startSignIn(input: {
  * Step 2: open the backend's sign-in window, then have Managed Auth deliver the
  * code. Also used to resend.
  *
- * Order matters: the window is recorded *before* the code is sent, so a code can
- * never exist for a sign-in the backend would refuse to release. Re-opening is
- * deliberate — the previous window (or code) may have expired.
+ * Order matters twice over. The window is recorded *before* the code is sent, so
+ * a code can never exist for a sign-in the backend would refuse to release; and
+ * it is recorded *before the rate-limit check*, so a throttled send cannot be
+ * the one path that leaves the window shut. The backend's verdict is keyed on
+ * the user, not the session, so until `/start` lands a fresh session still reads
+ * as verified from the previous sign-in's record — the throttled resend is the
+ * one way the UI could still walk into the workspace without the OTP.
+ * Re-opening is deliberate — the previous window (or code) may have expired.
  */
 export async function sendSignInCode(input: {
   email: string;
@@ -118,15 +123,6 @@ export async function sendSignInCode(input: {
     ? "Could not resend the code."
     : "Could not send the verification code.";
 
-  const limit = checkAuthRateLimit({
-    path: "email-otp/send-verification-otp",
-    ip: await callerIp(),
-    email: email.toLowerCase(),
-  });
-  if (!limit.allowed) {
-    return { ok: false, message: TOO_MANY_ATTEMPTS };
-  }
-
   const started = await apiFetch("/api/v1/auth/login/verification/start", {
     method: "POST",
   });
@@ -135,6 +131,15 @@ export async function sendSignInCode(input: {
       ok: false,
       message: "We couldn't start the email verification. Please try again.",
     };
+  }
+
+  const limit = checkAuthRateLimit({
+    path: "email-otp/send-verification-otp",
+    ip: await callerIp(),
+    email: email.toLowerCase(),
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
   }
 
   const error = await runAuth(() =>

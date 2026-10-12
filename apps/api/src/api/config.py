@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # --- Application ------------------------------------------------------
     # Product name used in branded emails (subject lines and headers).
     app_name: str
+    # Optional: front-end origin. Branded emails link the logo back to it; when
+    # unset the logo still renders, just unlinked.
+    app_url: str | None = None
     environment: str
     cors_origins: list[str]
 

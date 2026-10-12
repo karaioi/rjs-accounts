@@ -7,6 +7,9 @@ and reshaped by hand. Those files are a design surface, not a runtime asset:
 once the design settles, `emails.py` is updated to match and the files are
 re-rendered.
 
+The output is the exact HTML the mailer would send — no watermark or wrapper —
+so a preview can be diffed against the design it came from.
+
 Usage:
     uv run render-email-previews
     uv run render-email-previews --name "Ada Lovelace" --out /tmp/preview
@@ -16,19 +19,9 @@ from __future__ import annotations
 
 import argparse
 import pathlib
-import sys
 from datetime import UTC, datetime, timedelta
 
 from ..emails import Email, render_magic_link_email, render_otp_email
-
-BANNER = """<!--
-  DESIGN SNAPSHOT - not shipped at runtime.
-  Rendered from apps/api/src/api/emails.py by:
-      uv run render-email-previews
-  Edit the markup below freely. When the design settles, emails.py is what
-  gets updated to match, then this file is re-rendered.
--->
-"""
 
 
 def _repo_root() -> pathlib.Path:
@@ -39,57 +32,53 @@ def _repo_root() -> pathlib.Path:
     raise RuntimeError("Could not locate the repository root.")
 
 
-def _previews(*, app_name: str, code: str, to: str, name: str) -> dict[str, Email]:
-    expires_at = (datetime.now(UTC) + timedelta(minutes=5)).isoformat()
-    link = f"https://{app_name.split()[0].lower()}.example.com/api/auth/verify"
+def _previews(
+    *,
+    app_name: str,
+    code: str,
+    to: str,
+    name: str,
+    app_url: str | None,
+) -> dict[str, Email]:
+    expires_at = (datetime.now(UTC) + timedelta(minutes=10)).isoformat()
+    link = "https://app.rjsaccounts.com/auth/verify"
+
+    def otp(otp_type: str) -> Email:
+        return render_otp_email(
+            app_name=app_name,
+            code=code,
+            otp_type=otp_type,
+            to=to,
+            user_name=name,
+            expires_at=expires_at,
+            app_url=app_url,
+        )
+
+    def link_email(link_type: str) -> Email:
+        return render_magic_link_email(
+            app_name=app_name,
+            link_url=f"{link}?token=sample-{link_type or 'sign-in'}",
+            link_type=link_type,
+            to=to,
+            user_name=name,
+            expires_at=expires_at,
+            app_url=app_url,
+        )
+
     return {
-        "otp-sign-in.html": render_otp_email(
-            app_name=app_name,
-            code=code,
-            otp_type="sign-in",
-            to=to,
-            user_name=name,
-            expires_at=expires_at,
-        ),
-        "otp-verify-email.html": render_otp_email(
-            app_name=app_name,
-            code=code,
-            otp_type="email-verification",
-            to=to,
-            user_name=name,
-            expires_at=expires_at,
-        ),
-        "otp-reset-password.html": render_otp_email(
-            app_name=app_name,
-            code=code,
-            otp_type="forget-password",
-            to=to,
-            user_name=name,
-            expires_at=expires_at,
-        ),
-        "magic-link-sign-in.html": render_magic_link_email(
-            app_name=app_name,
-            link_url=f"{link}?token=demo-sign-in",
-            link_type="sign-in",
-            to=to,
-            user_name=name,
-            expires_at=expires_at,
-        ),
-        "magic-link-reset-password.html": render_magic_link_email(
-            app_name=app_name,
-            link_url=f"{link}?token=demo-reset",
-            link_type="forget-password",
-            to=to,
-            user_name=name,
-            expires_at=expires_at,
-        ),
+        "otp-sign-in.html": otp("sign-in"),
+        "otp-verify-email.html": otp("email-verification"),
+        "otp-reset-password.html": otp("forget-password"),
+        "magic-link-sign-in.html": link_email("sign-in"),
+        "magic-link-reset-password.html": link_email("forget-password"),
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app-name", default="RJS Accounts")
-    parser.add_argument("--code", default="123456", help="Sample OTP code")
+    parser.add_argument("--app-url", default="https://app.rjsaccounts.com")
+    parser.add_argument("--code", default="849201", help="Sample OTP code")
     parser.add_argument("--to", default="you@example.com", help="Sample recipient")
     parser.add_argument("--name", default="Sridhar", help="Sample recipient name")
     parser.add_argument(
@@ -103,11 +92,16 @@ def main(argv: list[str] | None = None) -> int:
     out = args.out or (_repo_root() / "docs" / "design" / "emails")
     out.mkdir(parents=True, exist_ok=True)
 
-    for filename, message in _previews(
-        app_name=args.app_name, code=args.code, to=args.to, name=args.name
-    ).items():
+    previews = _previews(
+        app_name=args.app_name,
+        code=args.code,
+        to=args.to,
+        name=args.name,
+        app_url=args.app_url or None,
+    )
+    for filename, message in previews.items():
         path = out / filename
-        path.write_text(f"{BANNER}\n{message.html}", encoding="utf-8")
+        path.write_text(message.html, encoding="utf-8")
         print(f"wrote {path}")
         print(f"      subject: {message.subject}")
 

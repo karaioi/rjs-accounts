@@ -67,7 +67,16 @@ export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isAuthEntry(pathname)) {
-    if (await isSignedIn(request)) {
+    // Only real page loads are redirected away from the auth pages. A POST here
+    // is a Server Action — `/login` and `/sign-up` own theirs — and answering one
+    // with a redirect rejects the caller's promise instead of running the step.
+    //
+    // This matters for the second step of sign-in: the sign-in gate is keyed on
+    // the **user**, not the session (`services/verification.py`), so the moment
+    // the password step sets a session cookie the gate still reads the previous
+    // sign-in's confirmation as `true`. Redirecting on that reading would kill
+    // the OTP step of the sign-in the user is actually making.
+    if (request.method === "GET" && (await isSignedIn(request))) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return NextResponse.next();
