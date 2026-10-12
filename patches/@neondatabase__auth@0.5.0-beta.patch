@@ -1,0 +1,117 @@
+diff --git a/dist/server/index.d.mts b/dist/server/index.d.mts
+index cbcdaca84a8e1fa9b0b8dc815d2762508e0e74c1..28e560bbf8475e02767cd122747cb8c13d54cdef 100644
+--- a/dist/server/index.d.mts
++++ b/dist/server/index.d.mts
+@@ -502,12 +502,12 @@ declare const parseCookieValue: (cookieString: string, name: string) => string |
+ //#endregion
+ //#region src/server/constants.d.ts
+ /** Prefix for all Neon Auth cookies */
+-declare const NEON_AUTH_COOKIE_PREFIX = "__Secure-neon-auth";
++declare const NEON_AUTH_COOKIE_PREFIX = "rjs-accounts";
+ /** Cookie name for cached session data (signed JWT) - used for server-side session caching */
+-declare const NEON_AUTH_SESSION_DATA_COOKIE_NAME = "__Secure-neon-auth.local.session_data";
++declare const NEON_AUTH_SESSION_DATA_COOKIE_NAME = "rjs-accounts.local.session_data";
+ /** Canonical cookie name for OAuth session challenge */
+-declare const NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME = "__Secure-neon-auth.session_challenge";
++declare const NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME = "rjs-accounts.session_challenge";
+ /** Cookie name for session token - the primary authentication cookie */
+-declare const NEON_AUTH_SESSION_COOKIE_NAME = "__Secure-neon-auth.session_token";
++declare const NEON_AUTH_SESSION_COOKIE_NAME = "rjs-accounts.session_token";
+ //#endregion
+ export { type AuthMiddlewareConfig, type AuthProxyConfig, type ClassifiedFetchFailure, type CookieOptions, DEFAULT_AUTH_SKIP_ROUTES, type MiddlewareResult, NEON_AUTH_COOKIE_PREFIX, NEON_AUTH_HEADER_MIDDLEWARE_NAME, NEON_AUTH_NETWORK_ERROR_CODES, NEON_AUTH_SERVER_PROXY_HEADER, NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME, NEON_AUTH_SESSION_COOKIE_NAME, NEON_AUTH_SESSION_DATA_COOKIE_NAME, type NeonAuthConfig, type NeonAuthLogLevel, type NeonAuthLogger, type NeonAuthLoggingInput, type NeonAuthMiddlewareConfig, type NeonAuthNetworkErrorCode, type NeonAuthServer, type NeonAuthServerApiError, type NeonAuthServerConfig, type ParsedCookie, type RequestContext, type RequestContextFactory, type RequireSessionData, type ResolvedNeonAuthLogging, type SessionCheckResult, type SessionCookieConfig, type SessionCookieSameSite, type SessionData, type SessionDataCookie, checkSessionRequired, classifyFetchFailure, createAuthServer, extractNeonAuthCookies, handleAuthProxyRequest, handleAuthRequest, handleAuthResponse, parseCookieValue, parseSessionData, parseSetCookies, processAuthMiddleware, resolveNeonAuthLogging, serializeSetCookie, shouldProtectRoute, validateCookieConfig, validateSessionData };
+\ No newline at end of file
+diff --git a/dist/server-b0OzGjXl.mjs b/dist/server-b0OzGjXl.mjs
+index f9a8ab87b7f03dc5594d9d71f1cbcd276c6ce319..1a10a851f0c5472fa7e268071173404c592b9cdf 100644
+--- a/dist/server-b0OzGjXl.mjs
++++ b/dist/server-b0OzGjXl.mjs
+@@ -291,7 +291,7 @@ const API_ENDPOINTS = {
+ //#endregion
+ //#region src/server/constants.ts
+ /** Prefix for all Neon Auth cookies */
+-const NEON_AUTH_COOKIE_PREFIX = "__Secure-neon-auth";
++const NEON_AUTH_COOKIE_PREFIX = "rjs-accounts";
+ /** Cookie name for cached session data (signed JWT) - used for server-side session caching */
+ const NEON_AUTH_SESSION_DATA_COOKIE_NAME = `${NEON_AUTH_COOKIE_PREFIX}.local.session_data`;
+ /** Legacy misspelled OAuth challenge cookie retained during the server migration */
+@@ -300,6 +300,18 @@ const NEON_AUTH_LEGACY_SESSION_CHALLENGE_COOKIE_NAME = `${NEON_AUTH_COOKIE_PREFI
+ const NEON_AUTH_SESSION_CHALLENGE_COOKIE_NAME = `${NEON_AUTH_COOKIE_PREFIX}.session_challenge`;
+ /** Cookie name for session token - the primary authentication cookie */
+ const NEON_AUTH_SESSION_COOKIE_NAME = `${NEON_AUTH_COOKIE_PREFIX}.session_token`;
++/**
++ * Prefix the hosted Neon Auth server stamps on the cookies it sets. The app
++ * presents cookies under `NEON_AUTH_COOKIE_PREFIX`; every cookie that crosses
++ * the upstream boundary is renamed with the helpers below, so the vendor name
++ * never reaches the browser and the app name never reaches the upstream.
++ */
++const NEON_AUTH_UPSTREAM_COOKIE_PREFIX = "__Secure-neon-auth";
++const NEON_AUTH_UPSTREAM_SESSION_COOKIE_NAME = `${NEON_AUTH_UPSTREAM_COOKIE_PREFIX}.session_token`;
++/** Rename the app-facing cookie names in a Cookie header to upstream names. */
++const toUpstreamCookieNames = (header) => header.replace(/(^|;\s*)rjs-accounts\./g, `$1${NEON_AUTH_UPSTREAM_COOKIE_PREFIX}.`);
++/** Rename one upstream cookie name to its app-facing name (no-op if already app-facing). */
++const toAppCookieName = (name) => name.startsWith(`${NEON_AUTH_UPSTREAM_COOKIE_PREFIX}.`) ? `${NEON_AUTH_COOKIE_PREFIX}${name.slice(NEON_AUTH_UPSTREAM_COOKIE_PREFIX.length)}` : name;
+ 
+ //#endregion
+ //#region src/server/utils/cookies.ts
+@@ -638,7 +650,7 @@ async function mintSessionDataFromResponse(responseHeaders, baseUrl, cookieConfi
+ 	let sessionTokenCookie;
+ 	let sessionTokenIsDeletion = false;
+ 	for (const cookieHeader of setCookieHeaders) {
+-		const parsed = parseSetCookies(cookieHeader).find((cookie) => cookie.name === NEON_AUTH_SESSION_COOKIE_NAME);
++		const parsed = parseSetCookies(cookieHeader).find((cookie) => cookie.name === NEON_AUTH_UPSTREAM_SESSION_COOKIE_NAME);
+ 		if (parsed) {
+ 			sessionTokenCookie = cookieHeader;
+ 			sessionTokenIsDeletion = parsed.maxAge === 0 || parsed.expires !== void 0 && parsed.expires.getTime() <= Date.now();
+@@ -924,7 +936,7 @@ function createAuthServer(config) {
+ 			for (const [key, value] of Object.entries(queryParams)) if (value !== void 0 && value !== null) url.searchParams.set(key, String(value));
+ 		}
+ 		const headers = {
+-			Cookie: cookies,
++			Cookie: toUpstreamCookieNames(cookies),
+ 			Origin: origin,
+ 			[NEON_AUTH_SERVER_PROXY_HEADER]: framework
+ 		};
+@@ -994,14 +1006,16 @@ function createAuthServer(config) {
+ 			for (const setCookieHeader of setCookieHeaders) {
+ 				const parsedCookies = parseSetCookies(setCookieHeader);
+ 				for (const cookie of parsedCookies) {
++					const { name: _upstreamName, value: _upstreamValue, ...cookieAttrs } = cookie;
++					const appCookieName = toAppCookieName(cookie.name);
+ 					const cookieOptions = {
+-						...cookie,
++						...cookieAttrs,
+ 						domain,
+ 						partitioned: void 0,
+ 						sameSite: effectiveSameSite,
+ 						secure: true
+ 					};
+-					await ctx.setCookie(cookie.name, cookie.value, cookieOptions);
++					await ctx.setCookie(appCookieName, cookie.value, cookieOptions);
+ 				}
+ 			}
+ 			try {
+@@ -1206,7 +1220,7 @@ const prepareRequestHeaders = (request) => {
+ 	const headers = new Headers();
+ 	for (const header of PROXY_HEADERS) if (request.headers.get(header)) headers.set(header, request.headers.get(header));
+ 	headers.set("Origin", getOrigin(request));
+-	headers.set("Cookie", extractNeonAuthCookies(request.headers));
++	headers.set("Cookie", toUpstreamCookieNames(extractNeonAuthCookies(request.headers)));
+ 	headers.set(NEON_AUTH_HEADER_MIDDLEWARE_NAME, "true");
+ 	return headers;
+ };
+@@ -1257,6 +1271,7 @@ const prepareResponseHeaders = (response, cookieConfig) => {
+ 		for (const cookieHeader of cookies) {
+ 			const parsedCookies = parseSetCookies(cookieHeader);
+ 			for (const parsedCookie of parsedCookies) {
++				parsedCookie.name = toAppCookieName(parsedCookie.name);
+ 				parsedCookie.partitioned = void 0;
+ 				parsedCookie.sameSite = effectiveSameSite;
+ 				parsedCookie.secure = true;
+@@ -1346,7 +1361,7 @@ async function trySessionCache(request, baseUrl, cookieConfig, log) {
+ function extractSessionTokenCookie(cookieHeader) {
+ 	const sessionToken = parseCookies(cookieHeader).get(NEON_AUTH_SESSION_COOKIE_NAME);
+ 	if (!sessionToken) return null;
+-	return `${NEON_AUTH_SESSION_COOKIE_NAME}=${sessionToken}`;
++	return `${toUpstreamCookieNames(NEON_AUTH_SESSION_COOKIE_NAME)}=${sessionToken}`;
+ }
+ 
+ //#endregion

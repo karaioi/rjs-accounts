@@ -470,10 +470,14 @@ def _type_label(otp_type: str) -> str:
 
 
 def _code_display(code: str) -> str:
-    """Format the code the way the email shows it: `849201` -> `849-201`."""
-    if len(code) == 6 and code.isdigit():
-        return f"{code[:3]}-{code[3:]}"
-    return code
+    """Format the code the way the email shows it: digits only, `849201`.
+
+    Managed Auth issues the code as `849-201`; the email drops the separator so
+    the code matches the six-digit field the sign-in form asks for and what the
+    user types (or copies) is never rejected for the hyphen.
+    """
+    digits = "".join(character for character in code if character.isdigit())
+    return digits or code
 
 
 def _expiry(expires_at: str | None, noun: str) -> tuple[str, str]:

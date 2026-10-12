@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cancelSignIn } from "@/lib/auth/actions";
 import { authClient } from "@/lib/auth/client";
 
 /**
@@ -24,6 +25,8 @@ export function SignOutButton() {
     } catch {
       // Clearing the client state is best-effort; navigating away is the point.
     }
+    // Forget any half-finished sign-in that was still waiting on a code.
+    await cancelSignIn();
     router.replace("/login");
     router.refresh();
   }

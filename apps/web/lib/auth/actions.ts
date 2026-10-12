@@ -7,6 +7,11 @@ import type { MeResponse } from "@/lib/api/types";
 import { describeAuthError, TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 import { checkAuthRateLimit } from "@/lib/auth/rate-limit";
 import { auth } from "@/lib/auth/server";
+import {
+  clearSignInEmail,
+  readSignInEmail,
+  setSignInEmail,
+} from "@/lib/auth/sign-in-cookie";
 import { loginSchema } from "@/lib/validations/login";
 import { otpSchema } from "@/lib/validations/otp";
 
@@ -149,6 +154,10 @@ export async function sendSignInCode(input: {
     return { ok: false, message: describeAuthError(error, fallback) };
   }
 
+  // The code is out, so remember which account it belongs to. This is what lets
+  // the OTP step survive a reload and lets `verifyCode` finish the right
+  // sign-in without trusting an email the client could have edited.
+  await setSignInEmail(email);
   return { ok: true };
 }
 
@@ -161,7 +170,9 @@ export async function verifyCode(input: {
   if (!parsed.success) {
     return { ok: false, message: "Enter the 6-digit code from your email." };
   }
-  const email = input.email.trim();
+  // Prefer the account we recorded when the code was sent; the client value is
+  // only a fallback for a flow that began before the cookie existed.
+  const email = (await readSignInEmail()) ?? input.email.trim();
   if (!email) {
     return { ok: false, message: "Enter your email address first." };
   }
@@ -207,6 +218,10 @@ export async function completeSignIn(): Promise<OtpResult> {
     };
   }
 
+  // The sign-in is finished: drop the pending-step cookie so a later visit to
+  // `/login` starts clean at the credentials screen.
+  await clearSignInEmail();
+
   // Approval is the remaining gate: a `pending` account keeps its session but
   // goes to the waiting screen.
   const account = await apiFetch("/api/v1/me");
@@ -218,4 +233,15 @@ export async function completeSignIn(): Promise<OtpResult> {
   }
 
   return { ok: true, destination: "/dashboard" };
+}
+
+/**
+ * Abandon a half-finished sign-in.
+ *
+ * The form's "Back" button returns to the credentials step; this drops the
+ * pending-step cookie with it so a reload doesn't jump straight back to an OTP
+ * screen for an account the visitor just left.
+ */
+export async function cancelSignIn(): Promise<void> {
+  await clearSignInEmail();
 }

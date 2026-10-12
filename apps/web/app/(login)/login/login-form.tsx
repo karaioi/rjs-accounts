@@ -44,6 +44,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import {
+  cancelSignIn as cancelSignInAction,
   completeSignIn as completeSignInAction,
   sendSignInCode,
   startSignIn as startSignInAction,
@@ -55,11 +56,16 @@ import { otpSchema } from "@/lib/validations/otp";
 
 type Step = "credentials" | "otp";
 
-export function LoginForm() {
+export function LoginForm({
+  initialEmail = null,
+}: {
+  /** The account a half-finished sign-in is waiting on, from the step cookie. */
+  initialEmail?: string | null;
+}) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [step, setStep] = useState<Step>("credentials");
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState<Step>(initialEmail ? "otp" : "credentials");
+  const [email, setEmail] = useState(initialEmail ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -522,9 +528,13 @@ export function LoginForm() {
                         type="button"
                         variant="ghost"
                         className="rounded-xl text-muted-foreground"
-                        onClick={() => {
+                        onClick={async () => {
                           setError(null);
                           setNotice(null);
+                          // Drop the pending-step cookie too, so a reload stays
+                          // on the credentials screen instead of jumping back.
+                          await cancelSignInAction();
+                          setEmail("");
                           setStep("credentials");
                         }}
                         disabled={pending}
