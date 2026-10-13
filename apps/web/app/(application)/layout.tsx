@@ -25,13 +25,13 @@ export default async function ApplicationLayout({
           name: me.name,
           email: me.email,
           organization: me.memberships[0]?.organization_name ?? null,
-          role: me.is_platform_admin ? "Platform Admin" : (me.memberships[0]?.role_slug ?? "User"),
+          role: me.is_platform_admin
+            ? "Platform Admin"
+            : (me.memberships[0]?.role_slug ?? "User"),
           accountStatus: me.account_status,
         }}
       />
-      <main className="flex-1 overflow-y-auto scroll-smooth">
-        {children}
-      </main>
+      <main className="flex-1 overflow-y-auto scroll-smooth">{children}</main>
     </div>
   );
 }

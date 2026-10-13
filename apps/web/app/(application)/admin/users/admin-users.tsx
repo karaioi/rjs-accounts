@@ -1,13 +1,16 @@
 "use client";
 
 import {
+  Building03Icon,
   CheckmarkCircle02Icon,
   RefreshIcon,
+  TrashIcon,
   UserCheck01Icon,
   UserRemove01Icon,
   UserSearch01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormMessage } from "@/components/auth-message";
@@ -20,7 +23,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { decideUser } from "@/lib/api/actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { decideUser, deleteUser } from "@/lib/api/actions";
 
 export interface PendingUser {
   user_id: string;
@@ -37,11 +48,19 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "UTC",
 });
 
+interface PendingAction {
+  user: PendingUser;
+  type: "approve" | "reject" | "delete";
+}
+
 export function AdminUsers({ users }: { users: PendingUser[] | null }) {
   const router = useRouter();
   const [queue, setQueue] = useState<PendingUser[]>(users ?? []);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+    null,
+  );
 
   async function decide(user: PendingUser, action: "approve" | "reject") {
     setError(null);
@@ -70,11 +89,70 @@ export function AdminUsers({ users }: { users: PendingUser[] | null }) {
       );
     } finally {
       setBusyId(null);
+      setPendingAction(null);
+    }
+  }
+
+  async function remove(user: PendingUser) {
+    setError(null);
+    setBusyId(user.user_id);
+
+    try {
+      const result = await deleteUser({
+        userId: user.user_id,
+      });
+
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      setQueue((current) =>
+        current.filter((entry) => entry.user_id !== user.user_id),
+      );
+      router.refresh();
+    } catch {
+      setError("Could not delete that account. Please try again.");
+    } finally {
+      setBusyId(null);
+      setPendingAction(null);
+    }
+  }
+
+  function handleConfirm() {
+    if (!pendingAction) return;
+    const { user, type } = pendingAction;
+    if (type === "delete") {
+      void remove(user);
+    } else {
+      void decide(user, type);
     }
   }
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
+      {/* Admin Nav Tabs */}
+      <div className="flex items-center gap-2 border-b border-black/10 pb-3">
+        <Link href="/admin/users">
+          <Button
+            variant="default"
+            className="rounded-xl bg-brand-blue text-white hover:bg-brand-blue/90"
+          >
+            <HugeiconsIcon icon={UserCheck01Icon} size={16} strokeWidth={1.5} />
+            Users
+          </Button>
+        </Link>
+        <Link href="/admin/organizations">
+          <Button
+            variant="ghost"
+            className="rounded-xl text-muted-foreground hover:text-foreground"
+          >
+            <HugeiconsIcon icon={Building03Icon} size={16} strokeWidth={1.5} />
+            Organizations
+          </Button>
+        </Link>
+      </div>
+
       <Reveal variant="fade-up">
         <Card className="rounded-3xl border-black/10 bg-[#fffafa]/70">
           <CardHeader>
@@ -148,9 +226,28 @@ export function AdminUsers({ users }: { users: PendingUser[] | null }) {
                         <Button
                           type="button"
                           variant="outline"
+                          className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={busy}
+                          onClick={() =>
+                            setPendingAction({ user, type: "delete" })
+                          }
+                          title="Permanently delete this account"
+                        >
+                          <HugeiconsIcon
+                            icon={TrashIcon}
+                            size={16}
+                            strokeWidth={1.5}
+                          />
+                          Delete
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
                           className="rounded-xl"
                           disabled={busy}
-                          onClick={() => decide(user, "reject")}
+                          onClick={() =>
+                            setPendingAction({ user, type: "reject" })
+                          }
                         >
                           <HugeiconsIcon
                             icon={UserRemove01Icon}
@@ -163,7 +260,9 @@ export function AdminUsers({ users }: { users: PendingUser[] | null }) {
                           type="button"
                           className="rounded-xl shadow-lg shadow-brand-green/25"
                           disabled={busy}
-                          onClick={() => decide(user, "approve")}
+                          onClick={() =>
+                            setPendingAction({ user, type: "approve" })
+                          }
                         >
                           <HugeiconsIcon
                             icon={CheckmarkCircle02Icon}
@@ -181,6 +280,76 @@ export function AdminUsers({ users }: { users: PendingUser[] | null }) {
           </CardContent>
         </Card>
       </Reveal>
+
+      <Dialog
+        open={!!pendingAction}
+        onOpenChange={(open) => {
+          if (!open && !busyId) {
+            setPendingAction(null);
+          }
+        }}
+      >
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingAction?.type === "delete"
+                ? "Delete account"
+                : pendingAction?.type === "reject"
+                  ? "Decline account"
+                  : "Approve account"}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingAction?.type === "delete"
+                ? "This will permanently delete the account and all related data. This action cannot be undone."
+                : pendingAction?.type === "reject"
+                  ? "This will decline the account. The user will not be able to access the system."
+                  : "This will approve the account and grant access to the system."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 rounded-2xl border border-black/5 bg-black/5 p-4 text-sm">
+            <p className="font-medium">
+              {pendingAction?.user.name || "Unnamed user"}
+            </p>
+            <p className="text-muted-foreground">
+              {pendingAction?.user.email ?? "No email"}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-3xl"
+              disabled={!!busyId}
+              onClick={() => setPendingAction(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className={`rounded-3xl ${
+                pendingAction?.type === "delete" ||
+                pendingAction?.type === "reject"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : ""
+              }`}
+              disabled={!!busyId}
+              onClick={handleConfirm}
+            >
+              {pendingAction?.type === "delete"
+                ? busyId
+                  ? "Deleting..."
+                  : "Delete"
+                : pendingAction?.type === "reject"
+                  ? busyId
+                    ? "Declining..."
+                    : "Decline"
+                  : busyId
+                    ? "Approving..."
+                    : "Approve"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

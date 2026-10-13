@@ -45,7 +45,7 @@ import {
   CUSTOMER_FIELD_LABELS,
   CUSTOMER_NO_GSTIN_HINT,
   CUSTOMER_PLACEHOLDERS,
-  CUSTOMER_TABLE_HEADERS
+  CUSTOMER_TABLE_HEADERS,
 } from "@/lib/data/customers";
 import {
   gstRegisteredSchema,
@@ -149,8 +149,7 @@ export function Customers({
                 <SheetHeader>
                   <SheetTitle>Add customer</SheetTitle>
                   <SheetDescription>
-                    Create a new tenant account. Fill in the details based on
-                    their GST registration status.
+                    Create a new tenant account.
                   </SheetDescription>
                 </SheetHeader>
                 <AddCustomerForm
@@ -171,7 +170,7 @@ export function Customers({
             <div className="overflow-hidden rounded-3xl border border-black/10">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-black/[0.03] hover:bg-black/[0.03]">
+                  <TableRow className="bg-black/3 hover:bg-black/3">
                     {CUSTOMER_TABLE_HEADERS.map((header) => (
                       <TableHead key={header}>{header}</TableHead>
                     ))}
@@ -181,9 +180,15 @@ export function Customers({
                   <AnimatePresence initial={false}>
                     {customers.map((customer, index) => (
                       <TableRow key={customer.id}>
-                        <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium">{customer.company_name ?? "—"}</TableCell>
-                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {customer.company_name ?? "—"}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {customer.name}
+                        </TableCell>
                         <TableCell>
                           {customer.gstin ? (
                             <code className="rounded-3xl bg-black/5 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
@@ -207,10 +212,10 @@ export function Customers({
                           )}
                         </TableCell>
                         <TableCell>
-                          {customer.contact_mobile || customer.contact_telephone ? (
+                          {customer.contact_mobile ||
+                          customer.contact_telephone ? (
                             <span className="text-xs text-muted-foreground">
-                              {customer.contact_mobile}
-                              " "
+                              {customer.contact_mobile}" "
                               {customer.contact_telephone}
                             </span>
                           ) : (
@@ -222,9 +227,7 @@ export function Customers({
                         <TableCell>
                           {customer.address1 || customer.address2 ? (
                             <span className="text-xs text-muted-foreground">
-                              {customer.address1}
-                              " "
-                              {customer.address2}
+                              {customer.address1}" "{customer.address2}
                             </span>
                           ) : (
                             <span className="text-xs text-muted-foreground">
@@ -282,7 +285,6 @@ export function Customers({
                 className="h-11 rounded-3xl pl-10"
               />
             </div>
-
           </CardContent>
         </Card>
       </Reveal>
@@ -316,7 +318,6 @@ function AddCustomerForm({
       contactTelephone: "",
       openingBalance: "",
       placeOfSupply: "",
-      phone: "",
       openingBalanceType: "credit" as "credit" | "debit",
     },
     validators: {
@@ -325,27 +326,28 @@ function AddCustomerForm({
     },
     onSubmit: async ({ value }) => {
       setPending(true);
-      try {          const bodyWithGstin = gstTab === "registered"
+      try {
+        const bodyWithGstin =
+          gstTab === "registered"
             ? { ...value, gstin: value.gstin }
             : { ...value, gstin: undefined };
 
-          const result = await createCustomer({
-            name: bodyWithGstin.companyName,
-            gstin: bodyWithGstin.gstin,
-            companyName: bodyWithGstin.companyName,
-            location: bodyWithGstin.location,
-            address1: bodyWithGstin.address1,
-            address2: bodyWithGstin.address2,
-            pincode: bodyWithGstin.pincode,
-            state: bodyWithGstin.state,
-            email: bodyWithGstin.email,
-            contactMobile: bodyWithGstin.contactMobile,
-            contactTelephone: bodyWithGstin.contactTelephone,
-            openingBalance: bodyWithGstin.openingBalance,
-            openingBalanceType: bodyWithGstin.openingBalanceType,
-            placeOfSupply: bodyWithGstin.placeOfSupply,
-            phone: bodyWithGstin.phone,
-          });
+        const result = await createCustomer({
+          name: bodyWithGstin.companyName,
+          gstin: bodyWithGstin.gstin,
+          companyName: bodyWithGstin.companyName,
+          location: bodyWithGstin.location,
+          address1: bodyWithGstin.address1,
+          address2: bodyWithGstin.address2,
+          pincode: bodyWithGstin.pincode,
+          state: bodyWithGstin.state,
+          email: bodyWithGstin.email,
+          contactMobile: bodyWithGstin.contactMobile,
+          contactTelephone: bodyWithGstin.contactTelephone,
+          openingBalance: bodyWithGstin.openingBalance,
+          openingBalanceType: bodyWithGstin.openingBalanceType,
+          placeOfSupply: bodyWithGstin.placeOfSupply,
+        });
 
         if (!result.ok) {
           onError(result.message);
@@ -389,7 +391,9 @@ function AddCustomerForm({
                   field.state.meta.isTouched && !field.state.meta.isValid;
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.gstin}</FieldLabel>
+                    <FieldLabel htmlFor={field.name}>
+                      {CUSTOMER_FIELD_LABELS.gstin}
+                    </FieldLabel>
                     <Input
                       id={field.name}
                       name={field.name}
@@ -424,7 +428,9 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.companyName}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>
+                  {CUSTOMER_FIELD_LABELS.companyName}
+                </FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -449,7 +455,9 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.location}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>
+                  {CUSTOMER_FIELD_LABELS.location}
+                </FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -474,7 +482,9 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.address1}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>
+                  {CUSTOMER_FIELD_LABELS.address1}
+                </FieldLabel>
                 <Textarea
                   id={field.name}
                   name={field.name}
@@ -499,7 +509,9 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.address2}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>
+                  {CUSTOMER_FIELD_LABELS.address2}
+                </FieldLabel>
                 <Textarea
                   id={field.name}
                   name={field.name}
@@ -524,7 +536,9 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.placeOfSupply}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>
+                  {CUSTOMER_FIELD_LABELS.placeOfSupply}
+                </FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -543,32 +557,6 @@ function AddCustomerForm({
           }}
         </form.Field>
 
-        <form.Field name="phone">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.phone}</FieldLabel>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="tel"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  aria-invalid={isInvalid}
-                  placeholder={CUSTOMER_PLACEHOLDERS.phone}
-                  className="h-11 rounded-3xl"
-                />
-                <Collapse show={isInvalid}>
-                  <FieldError errors={field.state.meta.errors} />
-                </Collapse>
-              </Field>
-            );
-          }}
-        </form.Field>
-
         <div className="grid grid-cols-2 gap-4">
           <form.Field name="pincode">
             {(field) => {
@@ -576,7 +564,9 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.pincode}</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>
+                    {CUSTOMER_FIELD_LABELS.pincode}
+                  </FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -601,7 +591,9 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.state}</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>
+                    {CUSTOMER_FIELD_LABELS.state}
+                  </FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -627,7 +619,9 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.email}</FieldLabel>
+                <FieldLabel htmlFor={field.name}>
+                  {CUSTOMER_FIELD_LABELS.email}
+                </FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -654,7 +648,9 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.contactMobile}</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>
+                    {CUSTOMER_FIELD_LABELS.contactMobile}
+                  </FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -703,14 +699,38 @@ function AddCustomerForm({
           </form.Field>
         </div>
 
-        <div className="grid grid-cols-[1fr_120px] gap-4">
+        <div className="grid grid-cols-2 gap-4">
+          <form.Field name="openingBalanceType">
+            {(field) => {
+              return (
+                <Field>
+                  <FieldLabel htmlFor={field.name}>
+                    {CUSTOMER_FIELD_LABELS.openingBalanceType}
+                  </FieldLabel>
+                  <Select
+                    value={field.state.value}
+                    onChange={(e) =>
+                      field.handleChange(e.target.value as "credit" | "debit")
+                    }
+                    className="h-11 rounded-3xl"
+                  >
+                    <option value="credit">Credit</option>
+                    <option value="debit">Debit</option>
+                  </Select>
+                </Field>
+              );
+            }}
+          </form.Field>
+
           <form.Field name="openingBalance">
             {(field) => {
               const isInvalid =
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.openingBalance}</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>
+                    {CUSTOMER_FIELD_LABELS.openingBalance}
+                  </FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -726,26 +746,6 @@ function AddCustomerForm({
                   <Collapse show={isInvalid}>
                     <FieldError errors={field.state.meta.errors} />
                   </Collapse>
-                </Field>
-              );
-            }}
-          </form.Field>
-
-          <form.Field name="openingBalanceType">
-            {(field) => {
-              return (
-                <Field>
-                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.openingBalanceType}</FieldLabel>
-                  <Select
-                    value={field.state.value}
-                    onChange={(e) =>
-                      field.handleChange(e.target.value as "credit" | "debit")
-                    }
-                    className="h-11 rounded-3xl"
-                  >
-                    <option value="credit">Credit</option>
-                    <option value="debit">Debit</option>
-                  </Select>
                 </Field>
               );
             }}
@@ -783,4 +783,3 @@ function AddCustomerForm({
     </form>
   );
 }
-

@@ -11,12 +11,6 @@ import { passwordSchema } from "./password";
 export const loginSchema = z.object({
   email: z.email("Enter a valid email address."),
   password: passwordSchema,
-  termsAccepted: z
-    .boolean()
-    .refine((value) => value, "You must accept the Terms & Conditions."),
-  privacyAccepted: z
-    .boolean()
-    .refine((value) => value, "You must accept the Privacy Policy."),
 });
 
 export type LoginValues = z.infer<typeof loginSchema>;

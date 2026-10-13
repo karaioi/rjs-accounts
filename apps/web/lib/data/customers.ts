@@ -35,7 +35,6 @@ export const CUSTOMER_FIELD_LABELS = {
   openingBalanceType: "Type",
   gstNo: "GST No",
   placeOfSupply: "Place of Supply",
-  phone: "Phone",
 } as const;
 
 export const CUSTOMER_PLACEHOLDERS = {
@@ -53,7 +52,6 @@ export const CUSTOMER_PLACEHOLDERS = {
   contactTelephone: "022-12345678",
   openingBalance: "0.00",
   placeOfSupply: "",
-  phone: "",
 } as const;
 
 export const CUSTOMER_NO_GSTIN_HINT =
@@ -70,4 +68,3 @@ export const CUSTOMER_TABLE_HEADERS = [
   "Place of Supply",
   "Opening Balance",
 ] as const;
-

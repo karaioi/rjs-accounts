@@ -74,8 +74,6 @@ export function LoginForm({
     defaultValues: {
       email: "",
       password: "",
-      termsAccepted: false,
-      privacyAccepted: false,
     },
     validators: {
       onSubmit: loginSchema,
@@ -342,57 +340,6 @@ export function LoginForm({
                         );
                       }}
                     </form.Field>
-
-                    {consents.map((consent, index) => (
-                      <form.Field key={consent.name} name={consent.name}>
-                        {(field) => {
-                          const isInvalid =
-                            field.state.meta.isTouched &&
-                            !field.state.meta.isValid;
-
-                          return (
-                            <Reveal delay={0.26 + index * 0.06}>
-                              <Field data-invalid={isInvalid}>
-                                <div className="flex items-center gap-2.5">
-                                  <Checkbox
-                                    id={field.name}
-                                    name={field.name}
-                                    checked={field.state.value}
-                                    onCheckedChange={(checked) =>
-                                      field.handleChange(checked === true)
-                                    }
-                                    onBlur={field.handleBlur}
-                                    aria-invalid={isInvalid}
-                                  />
-                                  <FieldLabel
-                                    htmlFor={field.name}
-                                    className="font-normal"
-                                  >
-                                    {consent.text}{" "}
-                                    <a
-                                      href={consent.href}
-                                      className="inline-flex items-center gap-1 font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
-                                    >
-                                      <HugeiconsIcon
-                                        icon={consent.icon}
-                                        size={14}
-                                        strokeWidth={1.5}
-                                      />
-                                      {consent.linkLabel}
-                                    </a>
-                                  </FieldLabel>
-                                </div>
-                                <Collapse show={isInvalid}>
-                                  <FieldError
-                                    errors={field.state.meta.errors}
-                                  />
-                                </Collapse>
-                              </Field>
-                            </Reveal>
-                          );
-                        }}
-                      </form.Field>
-                    ))}
                   </FieldGroup>
 
                   <Reveal delay={0.4} className="mt-7">

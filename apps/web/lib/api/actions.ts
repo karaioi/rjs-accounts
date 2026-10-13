@@ -67,6 +67,78 @@ export async function decideUser(input: {
   return { ok: true };
 }
 
+/** Permanently delete a user account (platform admins only). */
+export async function deleteUser(input: {
+  userId: string;
+}): Promise<ActionResult> {
+  if (!UUID.test(input.userId)) {
+    return { ok: false, message: "That account could not be found." };
+  }
+
+  const response = await apiFetch(`/api/v1/users/${input.userId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: "Could not delete that account. Please try again.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/** Permanently delete an organization (platform admins only). */
+export async function deleteOrganization(input: {
+  organizationId: string;
+}): Promise<ActionResult> {
+  if (!UUID.test(input.organizationId)) {
+    return { ok: false, message: "That organization could not be found." };
+  }
+
+  const response = await apiFetch(
+    `/api/v1/organizations/${input.organizationId}`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: "Could not delete that organization. Please try again.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/** Activate a pending organization (platform admins only). */
+export async function approveOrganization(input: {
+  organizationId: string;
+}): Promise<ActionResult> {
+  if (!UUID.test(input.organizationId)) {
+    return { ok: false, message: "That organization could not be found." };
+  }
+
+  const response = await apiFetch(
+    `/api/v1/organizations/${input.organizationId}/approve`,
+    {
+      method: "POST",
+    },
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: "Could not approve that organization. Please try again.",
+    };
+  }
+
+  return { ok: true };
+}
+
 /** Create a customer (platform admins only). */
 export async function createCustomer(input: {
   name: string;
@@ -83,7 +155,6 @@ export async function createCustomer(input: {
   openingBalance?: string;
   openingBalanceType?: "credit" | "debit";
   placeOfSupply?: string;
-  phone?: string;
 }): Promise<ActionResult> {
   const response = await apiFetch("/api/v1/customers", {
     method: "POST",
@@ -102,7 +173,6 @@ export async function createCustomer(input: {
       opening_balance: input.openingBalance || null,
       opening_balance_type: input.openingBalanceType || null,
       place_of_supply: input.placeOfSupply || null,
-      phone: input.phone || null,
     }),
   });
 

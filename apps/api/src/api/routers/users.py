@@ -156,3 +156,31 @@ def reject_user(
     session.refresh(profile)
 
     return _to_out(profile, email, name, verified)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: uuid.UUID,
+    request: Request,
+    principal: Principal = Depends(require_platform_admin),
+    session: Session = Depends(get_session),
+) -> None:
+    """Permanently delete a user and all related data.
+
+    This removes the user profile and associated records. The identity record
+    in the managed auth system may remain depending on system configuration.
+    """
+    profile, email, name, verified = _load(session, user_id)
+
+    write_audit(
+        session,
+        actor_user_id=principal.user_id,
+        action="account.delete",
+        entity_type="user_profile",
+        entity_id=str(user_id),
+        before={"status": profile.status, "email": email, "name": name},
+        request=request,
+    )
+
+    session.delete(profile)
+    session.commit()

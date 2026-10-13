@@ -5,8 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,7 @@ def _to_out(org: Organization, role_slug: str | None) -> OrganizationOut:
 @router.get("", response_model=list[OrganizationOut])
 def list_organizations(
     customer_id: uuid.UUID | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
     principal: Principal = Depends(require_verified_login),
     session: Session = Depends(get_session),
 ) -> list[OrganizationOut]:
@@ -44,7 +45,34 @@ def list_organizations(
         stmt = select(Organization).order_by(Organization.name)
         if customer_id:
             stmt = stmt.where(Organization.customer_id == customer_id)
-        return [_to_out(org, None) for org in session.execute(stmt).scalars().all()]
+        if status_filter:
+            stmt = stmt.where(Organization.status == status_filter)
+        app_orgs = session.execute(stmt).scalars().all()
+        result = [_to_out(org, None) for org in app_orgs]
+
+        # Also include any neon_auth.organization entries that may not be in app.organization
+        if not customer_id:
+            existing_ids = {org.id for org in app_orgs}
+            existing_slugs = {org.slug for org in app_orgs}
+            neon_rows = session.execute(
+                text('select id, name, slug, "createdAt" from neon_auth.organization order by name')
+            ).all()
+            for row in neon_rows:
+                if row.id not in existing_ids and row.slug not in existing_slugs:
+                    if not status_filter or status_filter == "active":
+                        result.append(
+                            OrganizationOut(
+                                id=row.id,
+                                customer_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                                name=row.name,
+                                slug=row.slug,
+                                status="active",
+                                role_slug=None,
+                                created_at=row.createdAt,
+                                approved_at=row.createdAt,
+                            )
+                        )
+        return result
 
     stmt = (
         select(Organization, Membership.role_slug)
@@ -57,6 +85,8 @@ def list_organizations(
     )
     if customer_id:
         stmt = stmt.where(Organization.customer_id == customer_id)
+    if status_filter:
+        stmt = stmt.where(Organization.status == status_filter)
     return [_to_out(org, role) for org, role in session.execute(stmt).all()]
 
 
@@ -118,6 +148,21 @@ def create_organization(
             detail="That slug is already used by one of this customer's organizations",
         ) from exc
 
+    # Sync organization into neon_auth schema
+    session.execute(
+        text("""
+            insert into neon_auth.organization (id, name, slug, "createdAt")
+            values (:id, :name, :slug, :created_at)
+            on conflict (slug) do update set name = excluded.name
+        """),
+        {
+            "id": organization.id,
+            "name": organization.name,
+            "slug": organization.slug,
+            "created_at": organization.created_at or now,
+        },
+    )
+
     write_audit(
         session,
         actor_user_id=principal.user_id,
@@ -158,6 +203,22 @@ def approve_organization(
     organization.approved_by = principal.user_id
     organization.approved_at = datetime.now(UTC)
 
+    # Ensure it exists and is synced in neon_auth
+    now = datetime.now(UTC)
+    session.execute(
+        text("""
+            insert into neon_auth.organization (id, name, slug, "createdAt")
+            values (:id, :name, :slug, :created_at)
+            on conflict (slug) do update set name = excluded.name
+        """),
+        {
+            "id": organization.id,
+            "name": organization.name,
+            "slug": organization.slug,
+            "created_at": organization.created_at or now,
+        },
+    )
+
     write_audit(
         session,
         actor_user_id=principal.user_id,
@@ -171,3 +232,68 @@ def approve_organization(
     session.commit()
     session.refresh(organization)
     return _to_out(organization, None)
+
+
+@router.delete("/{organization_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_organization(
+    organization_id: uuid.UUID,
+    request: Request,
+    principal: Principal = Depends(require_platform_admin),
+    session: Session = Depends(get_session),
+) -> None:
+    """Permanently delete an organization and remove from both app and neon_auth schemas."""
+    organization = session.get(Organization, organization_id)
+    if organization is None:
+        # Check if it exists only in neon_auth.organization
+        neon_row = session.execute(
+            text('select id, name, slug from neon_auth.organization where id = :id'),
+            {"id": organization_id},
+        ).first()
+        if neon_row is not None:
+            write_audit(
+                session,
+                actor_user_id=principal.user_id,
+                action="organization.delete",
+                entity_type="organization",
+                entity_id=str(organization_id),
+                before={"name": neon_row.name, "slug": neon_row.slug},
+                request=request,
+            )
+            session.execute(
+                text('delete from neon_auth.organization where id = :id'),
+                {"id": organization_id},
+            )
+            session.commit()
+            return
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
+
+    org_id_str = str(organization.id)
+    org_slug = organization.slug
+    org_name = organization.name
+    customer_id = organization.customer_id
+
+    write_audit(
+        session,
+        actor_user_id=principal.user_id,
+        action="organization.delete",
+        entity_type="organization",
+        entity_id=org_id_str,
+        customer_id=customer_id,
+        organization_id=organization.id,
+        before={"name": org_name, "slug": org_slug, "status": organization.status},
+        request=request,
+    )
+
+    # Delete from app.organization (cascades to app.membership)
+    session.delete(organization)
+
+    # Delete from neon_auth.organization (cascades to neon_auth.member, neon_auth.invitation)
+    session.execute(
+        text('delete from neon_auth.organization where id = :id or slug = :slug'),
+        {"id": organization_id, "slug": org_slug},
+    )
+
+    session.commit()

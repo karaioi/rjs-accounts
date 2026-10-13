@@ -87,7 +87,6 @@ class CustomerOut(BaseModel):
     opening_balance: str | None = None
     opening_balance_type: str | None = None
     place_of_supply: str | None = None
-    phone: str | None = None
     created_at: datetime
     approved_at: datetime | None
 
@@ -108,7 +107,6 @@ class CustomerCreate(BaseModel):
     opening_balance: str | None = None
     opening_balance_type: str | None = None
     place_of_supply: str | None = None
-    phone: str | None = None
 
 
 class OrganizationOut(BaseModel):

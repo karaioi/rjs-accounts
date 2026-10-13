@@ -18,7 +18,6 @@ export interface Customer {
   opening_balance: string | null;
   opening_balance_type: "credit" | "debit" | null;
   place_of_supply: string | null;
-  phone: string | null;
   created_at: string;
   approved_at: string | null;
 }
@@ -39,6 +38,18 @@ export interface Membership {
   customer_id: string;
   role_slug: string;
   status: string;
+}
+
+/** `GET /api/v1/organizations` */
+export interface OrganizationItem {
+  id: string;
+  customer_id: string;
+  name: string;
+  slug: string;
+  status: string;
+  role_slug: string | null;
+  created_at: string;
+  approved_at: string | null;
 }
 
 /** `GET /api/v1/me` */

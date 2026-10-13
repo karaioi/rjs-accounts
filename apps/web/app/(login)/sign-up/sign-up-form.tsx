@@ -390,15 +390,7 @@ export function SignUpForm() {
                                   </InputGroupButton>
                                 </InputGroupAddon>
                               </InputGroup>
-                              <Collapse
-                                show={
-                                  field.state.value.length > 0 && !isInvalid
-                                }
-                              >
-                                <PasswordRequirements
-                                  value={field.state.value}
-                                />
-                              </Collapse>
+                              <PasswordRequirements value={field.state.value} />
                               <Collapse show={isInvalid}>
                                 <FieldError errors={field.state.meta.errors} />
                               </Collapse>

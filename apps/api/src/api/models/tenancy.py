@@ -80,7 +80,6 @@ class Customer(TimestampsMixin, Base):
     opening_balance: Mapped[str | None] = mapped_column(Text)
     opening_balance_type: Mapped[str | None] = mapped_column(Text)
     place_of_supply: Mapped[str | None] = mapped_column(Text)
-    phone: Mapped[str | None] = mapped_column(Text)
 
     organizations: Mapped[list[Organization]] = relationship(
         back_populates="customer", cascade="all, delete-orphan"

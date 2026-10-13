@@ -6,6 +6,7 @@ import {
   BadgeIndianRupeeIcon,
   BankIcon,
   Book03Icon,
+  Building03Icon,
   CalculateIcon,
   ChevronDownIcon,
   DashboardCircleIcon,
@@ -14,9 +15,11 @@ import {
   Package01Icon,
   Receipt,
   Search01Icon,
+  Shield01Icon,
   ShoppingBag01Icon,
   TrendingUpIcon,
   UnfoldMoreDownIcon,
+  UserCheck01Icon,
   UserIcon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
@@ -154,18 +157,40 @@ interface SidebarUser {
 }
 
 export function Sidebar({
-  isAdmin: _isAdmin = false,
+  isAdmin = false,
   user,
 }: {
   isAdmin?: boolean;
   user?: SidebarUser;
 }) {
   const pathname = usePathname();
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({
+    Admin: pathname.startsWith("/admin"),
+  });
 
   function toggle(label: string) {
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
   }
+
+  const items: NavItem[] = isAdmin
+    ? [
+        ...(navItems[0] ? [navItems[0]] : []),
+        {
+          href: "/admin",
+          label: "Admin",
+          icon: Shield01Icon,
+          children: [
+            { href: "/admin/users", label: "Users", icon: UserCheck01Icon },
+            {
+              href: "/admin/organizations",
+              label: "Organizations",
+              icon: Building03Icon,
+            },
+          ],
+        },
+        ...navItems.slice(1),
+      ]
+    : navItems;
 
   return (
     <Reveal variant="fade-in" className="sticky top-0 flex h-dvh shrink-0 p-2">
@@ -194,7 +219,7 @@ export function Sidebar({
         {/* Navigation */}
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-4 pb-4">
           <Stagger stagger={0.05}>
-            {navItems.map((item) => {
+            {items.map((item) => {
               const active = isActive(pathname, item);
               const isExpanded = expanded[item.label] ?? false;
               const Icon = item.icon;

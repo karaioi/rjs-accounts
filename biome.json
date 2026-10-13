@@ -27,17 +27,17 @@
       }
     },
     {
-      "includes": ["apps/web/lib/auth/client.ts"],
-      "assist": {
-        "actions": {
-          "source": {
-            "organizeImports": "off"
+      "includes": ["apps/web/components/sidebar.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
           }
         }
       }
     },
     {
-      "includes": ["apps/web/components/sidebar.tsx"],
+      "includes": ["apps/web/components/motion/reveal.tsx"],
       "linter": {
         "rules": {
           "style": {
@@ -76,7 +76,7 @@
     "enabled": true,
     "actions": {
       "source": {
-        "organizeImports": "on"
+        "organizeImports": "off"
       }
     }
   }

@@ -82,6 +82,7 @@ export const accountStatuses: Record<string, StatusCopy> = {
   pending: { label: "Pending approval", tone: "warning" },
   rejected: { label: "Declined", tone: "danger" },
   suspended: { label: "Suspended", tone: "danger" },
+  archived: { label: "Archived", tone: "neutral" },
 };
 
 const orgRolesBySlug = new Map<string, OrgRoleCopy>(

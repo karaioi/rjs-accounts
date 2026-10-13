@@ -77,7 +77,6 @@ def create_customer(
         opening_balance=body.opening_balance,
         opening_balance_type=body.opening_balance_type,
         place_of_supply=body.place_of_supply,
-        phone=body.phone,
         created_by=principal.user_id,
         approved_by=principal.user_id,
         approved_at=now,
@@ -99,7 +98,7 @@ def create_customer(
         entity_type="customer",
         entity_id=str(customer.id),
         customer_id=customer.id,
-        after={"name": customer.name, "slug": customer.slug, "phone": customer.phone},
+        after={"name": customer.name, "slug": customer.slug},
         request=request,
     )
     session.commit()

@@ -25,13 +25,13 @@ const baseFields = {
     .trim()
     .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number."),
   contactTelephone: z.string().trim().min(1, "Telephone is required."),
+  openingBalanceType: z.enum(["credit", "debit"]),
   openingBalance: z
     .string()
     .trim()
     .regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),
-  openingBalanceType: z.enum(["credit", "debit"]),
   placeOfSupply: z.string().trim(),
-  phone: z.string().trim(),
+  remarks: z.string().trim(),
 };
 
 export const gstRegisteredSchema = z.object({
@@ -48,7 +48,6 @@ export const gstRegisteredSchema = z.object({
 export const gstUnregisteredSchema = z.object({
   gstin: z.string().trim(),
   ...baseFields,
-  phone: z.string().trim(),
 });
 
 export type CustomerValues = typeof baseFields;
