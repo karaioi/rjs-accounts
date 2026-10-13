@@ -3,11 +3,11 @@
 import { cn } from "cn";
 import type * as React from "react";
 
-interface SelectProps extends React.ComponentProps<"select"> {
-  children: React.ReactNode;
-}
-
-function Select({ className, children, ...props }: SelectProps) {
+function Select({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"select">) {
   return (
     <select
       data-slot="select"

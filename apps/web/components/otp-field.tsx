@@ -8,19 +8,7 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-
-/**
- * A 6-digit code as the shadcn `InputOTP`. The slots are split into three
- * pairs (2–2–2) with dividers between them, so the code is easier to read
- * back and transcribe than one unbroken row of six boxes.
- */
-const PAIRS = [
-  [0, 1],
-  [2, 3],
-  [4, 5],
-] as const;
-
-const SLOT_COUNT = PAIRS.flat().length;
+import { OTP_PAIRS, OTP_SLOT_COUNT, type OtpFieldProps } from "@/lib/data/auth";
 
 export function OtpField({
   id,
@@ -30,20 +18,12 @@ export function OtpField({
   onChange,
   onBlur,
   className,
-}: {
-  id: string;
-  name: string;
-  value: string;
-  invalid: boolean;
-  onChange: (value: string) => void;
-  onBlur: () => void;
-  className?: string;
-}) {
+}: OtpFieldProps) {
   return (
     <InputOTP
       id={id}
       name={name}
-      maxLength={SLOT_COUNT}
+      maxLength={OTP_SLOT_COUNT}
       inputMode="numeric"
       autoComplete="one-time-code"
       value={value}
@@ -52,7 +32,7 @@ export function OtpField({
       aria-invalid={invalid}
       containerClassName={cn("justify-center", className)}
     >
-      {PAIRS.map((pair, pairIndex) => (
+      {OTP_PAIRS.map((pair, pairIndex) => (
         <Fragment key={pair[0]}>
           {pairIndex > 0 && <InputOTPSeparator />}
           <InputOTPGroup>

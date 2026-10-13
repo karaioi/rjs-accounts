@@ -7,7 +7,21 @@
  * an unknown slug still falls back to something readable rather than nothing.
  */
 
+import type { MeResponse, OrganizationItem } from "@/lib/api/types";
+
 export type BadgeTone = "success" | "warning" | "danger" | "neutral";
+
+export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
+  success: "border-brand-green/25 bg-brand-green/10 text-brand-green",
+  warning: "border-amber-500/30 bg-amber-500/10 text-amber-700",
+  danger: "border-destructive/25 bg-destructive/10 text-destructive",
+  neutral: "border-black/10 bg-black/5 text-muted-foreground",
+};
+
+export interface AccessSummaryProps {
+  me: MeResponse;
+  organizations?: OrganizationItem[];
+}
 
 export interface RoleCopy {
   label: string;

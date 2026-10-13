@@ -1,18 +1,10 @@
 "use client";
 
 import { cn } from "cn";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import Beams, { type BeamsProps } from "@/components/Beams";
-import { type Feature, FeatureCard } from "@/components/feature-card";
+import Beams from "@/components/Beams";
+import { FeatureCard } from "@/components/feature-card";
 import { Stagger, StaggerItem } from "@/components/motion/reveal";
-
-interface PromoPanelProps extends ComponentPropsWithoutRef<"div"> {
-  logo?: ReactNode;
-  title: string;
-  description?: string;
-  features?: Feature[];
-  beams?: Partial<BeamsProps>;
-}
+import type { PromoPanelProps } from "@/lib/data/promo";
 
 export function PromoPanel({
   logo,

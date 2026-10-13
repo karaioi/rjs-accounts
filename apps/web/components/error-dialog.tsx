@@ -11,21 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { ErrorDialogProps } from "@/lib/data/auth";
 
 /**
  * Modal shown when an auth step fails. Auth errors are surfaced here (rather
  * than inline) so the reason is impossible to miss; `message` also drives
  * visibility, so callers just pass their `error` state.
  */
-export function ErrorDialog({
-  title,
-  message,
-  onClose,
-}: {
-  title: string;
-  message: string | null;
-  onClose: () => void;
-}) {
+export function ErrorDialog({ title, message, onClose }: ErrorDialogProps) {
   return (
     <Dialog
       open={message !== null}

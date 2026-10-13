@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { apiFetch } from "@/lib/api/server";
-import { AdminUsers, type PendingUser } from "./admin-users";
+import type { PendingUser } from "@/lib/api/types";
+import { AdminUsers } from "./admin-users";
 
 /**
  * Platform-admin approval queue. Guarded three ways: the Proxy requires a

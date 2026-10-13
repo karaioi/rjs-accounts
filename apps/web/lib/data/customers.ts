@@ -1,9 +1,30 @@
+import type { Customer } from "@/lib/api/types";
+
 /**
  * Static content for the customers domain.
  *
  * Keeps strings out of the page so copy and labels live in one place and can be
  * reused / reviewed independently of the component.
  */
+
+export type GstTab = "registered" | "unregistered";
+
+export interface CustomersProps {
+  customers: Customer[];
+  total: number;
+  page: number;
+  totalPages: number;
+  search: string;
+}
+
+export interface AddCustomerFormProps {
+  onDone: () => void;
+  onError: (message: string) => void;
+}
+
+export interface CustomersPageProps {
+  searchParams: Promise<{ page?: string; search?: string }>;
+}
 
 export const CUSTOMER_DATE_FORMATTER = new Intl.DateTimeFormat("en-IN", {
   day: "2-digit",

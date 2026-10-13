@@ -53,6 +53,12 @@ export const scaleIn: Variants = {
   show: { opacity: 1, scale: 1 },
 };
 
+export const VARIANTS_BY_VARIANT = {
+  "fade-up": fadeUp,
+  "fade-in": fadeIn,
+  "scale-in": scaleIn,
+} as const;
+
 /** Parent variant that sequences its children's entrance. */
 export function staggerContainer(
   staggerChildren = 0.09,

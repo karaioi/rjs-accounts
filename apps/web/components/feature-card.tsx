@@ -1,20 +1,10 @@
 "use client";
 
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
 import { motion } from "motion/react";
 import { SPRING_POP, SPRING_SOFT } from "@/components/motion/variants";
-
-export interface Feature {
-  icon: IconSvgElement;
-  title: string;
-  description: string;
-}
-
-interface FeatureCardProps {
-  feature: Feature;
-  className?: string;
-}
+import type { FeatureCardProps } from "@/lib/data/promo";
 
 export function FeatureCard({ feature, className }: FeatureCardProps) {
   return (

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cancelSignIn } from "@/lib/auth/actions";
 import { authClient } from "@/lib/auth/client";
+import type { SignOutButtonProps } from "@/lib/data/auth";
 
 /**
  * Ends the session and returns to the sign-in screen.
@@ -14,11 +15,7 @@ import { authClient } from "@/lib/auth/client";
  * This is the only way back to `/login`: the Proxy hides the sign-in and
  * sign-up pages for as long as a session exists.
  */
-export function SignOutButton({
-  variant = "full",
-}: {
-  variant?: "full" | "icon" | "popover";
-}) {
+export function SignOutButton({ variant = "full" }: SignOutButtonProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 

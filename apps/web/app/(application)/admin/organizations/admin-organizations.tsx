@@ -24,7 +24,13 @@ import {
 } from "@/components/ui/dialog";
 import { approveOrganization, deleteOrganization } from "@/lib/api/actions";
 import type { OrganizationItem } from "@/lib/api/types";
-import { accountStatus, type BadgeTone } from "@/lib/data/roles";
+import {
+  ADMIN_DATE_FORMATTER,
+  ORGANIZATION_STATUS_FILTERS,
+  type AdminOrganizationsProps,
+  type OrganizationStatusFilter,
+} from "@/lib/data/admin";
+import { BADGE_TONE_CLASSES, accountStatus } from "@/lib/data/roles";
 import {
   Building03Icon,
   CheckmarkCircle02Icon,
@@ -35,35 +41,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-const toneClass: Record<BadgeTone, string> = {
-  success: "border-brand-green/25 bg-brand-green/10 text-brand-green",
-  warning: "border-amber-500/30 bg-amber-500/10 text-amber-700",
-  danger: "border-destructive/25 bg-destructive/10 text-destructive",
-  neutral: "border-black/10 bg-black/5 text-muted-foreground",
-};
-
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeZone: "UTC",
-});
-
-const STATUS_FILTERS = [
-  "all",
-  "active",
-  "pending",
-  "suspended",
-  "archived",
-] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number];
-
-export function AdminOrganizations({
-  organizations,
-}: {
-  organizations: OrganizationItem[] | null;
-}) {
+export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
   const router = useRouter();
   const [list, setList] = useState<OrganizationItem[]>(organizations ?? []);
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>("all");
+  const [activeFilter, setActiveFilter] =
+    useState<OrganizationStatusFilter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<OrganizationItem | null>(
@@ -173,7 +155,7 @@ export function AdminOrganizations({
 
               {/* Status filter pills */}
               <div className="flex flex-wrap items-center gap-1.5">
-                {STATUS_FILTERS.map((f) => (
+                {ORGANIZATION_STATUS_FILTERS.map((f) => (
                   <button
                     key={f}
                     type="button"
@@ -243,9 +225,11 @@ export function AdminOrganizations({
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Created{" "}
-                          {dateFormatter.format(new Date(org.created_at))}
+                          {ADMIN_DATE_FORMATTER.format(
+                            new Date(org.created_at),
+                          )}
                           {org.approved_at
-                            ? ` · Approved ${dateFormatter.format(new Date(org.approved_at))}`
+                            ? ` · Approved ${ADMIN_DATE_FORMATTER.format(new Date(org.approved_at))}`
                             : ""}
                         </p>
                       </div>
@@ -253,7 +237,7 @@ export function AdminOrganizations({
                       <div className="flex shrink-0 items-center gap-2">
                         <Badge
                           variant="outline"
-                          className={toneClass[orgStatus.tone]}
+                          className={BADGE_TONE_CLASSES[orgStatus.tone]}
                         >
                           {orgStatus.label}
                         </Badge>

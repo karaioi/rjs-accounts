@@ -29,7 +29,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldError,
@@ -50,21 +49,17 @@ import {
   startSignIn as startSignInAction,
   verifyCode,
 } from "@/lib/auth/actions";
-import { consents } from "@/lib/data/consents";
 import { type LoginValues, loginSchema } from "@/lib/validations/login";
 import { otpSchema } from "@/lib/validations/otp";
 
-type Step = "credentials" | "otp";
+import type { LoginFormProps, LoginStep } from "@/lib/data/auth";
 
-export function LoginForm({
-  initialEmail = null,
-}: {
-  /** The account a half-finished sign-in is waiting on, from the step cookie. */
-  initialEmail?: string | null;
-}) {
+export function LoginForm({ initialEmail = null }: LoginFormProps) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [step, setStep] = useState<Step>(initialEmail ? "otp" : "credentials");
+  const [step, setStep] = useState<LoginStep>(
+    initialEmail ? "otp" : "credentials",
+  );
   const [email, setEmail] = useState(initialEmail ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

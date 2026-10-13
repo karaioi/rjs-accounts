@@ -1,29 +1,11 @@
 "use client";
 
 import {
-  AnalysisTextLinkIcon,
-  AnalyticsUpIcon,
-  BadgeIndianRupeeIcon,
-  BankIcon,
-  Book03Icon,
-  Building03Icon,
-  CalculateIcon,
   ChevronDownIcon,
-  DashboardCircleIcon,
-  DocumentCodeIcon,
-  ListIcon,
-  Package01Icon,
-  Receipt,
   Search01Icon,
-  Shield01Icon,
-  ShoppingBag01Icon,
-  TrendingUpIcon,
   UnfoldMoreDownIcon,
-  UserCheck01Icon,
-  UserIcon,
-  Wallet01Icon,
 } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -33,136 +15,14 @@ import { Collapse } from "@/components/motion/collapse";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "./ui/button";
+import { Button } from "@/components/ui/button";
+import {
+  getNavigationItems,
+  isActive,
+  type SidebarProps,
+} from "@/lib/data/navigation";
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: IconSvgElement;
-  children?: NavItem[];
-  badge?: number;
-}
-
-const navItems: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: DashboardCircleIcon,
-  },
-  {
-    href: "/customers",
-    label: "Customers",
-    icon: UserIcon,
-  },
-  {
-    href: "/products",
-    label: "Products",
-    icon: Package01Icon,
-  },
-  {
-    href: "/sales",
-    label: "Sales",
-    icon: AnalyticsUpIcon,
-    children: [
-      {
-        href: "/sales/quotations",
-        label: "Quotations",
-        icon: DocumentCodeIcon,
-      },
-      { href: "/sales/invoices", label: "Invoices", icon: Receipt },
-      {
-        href: "/sales/payments-received",
-        label: "Payments Received",
-        icon: TrendingUpIcon,
-      },
-    ],
-  },
-  {
-    href: "/purchases",
-    label: "Purchases",
-    icon: ShoppingBag01Icon,
-    children: [
-      {
-        href: "/purchases/purchase-orders",
-        label: "Purchase Orders",
-        icon: DocumentCodeIcon,
-      },
-      {
-        href: "/purchases/purchase-bills",
-        label: "Purchase Bills",
-        icon: Receipt,
-      },
-      {
-        href: "/purchases/payments-made",
-        label: "Payments Made",
-        icon: TrendingUpIcon,
-      },
-    ],
-  },
-  {
-    href: "/expenses",
-    label: "Expenses",
-    icon: BadgeIndianRupeeIcon,
-  },
-  {
-    href: "/accounting",
-    label: "Accounting",
-    icon: CalculateIcon,
-    children: [
-      { href: "/accounting/entries", label: "Entries", icon: ListIcon },
-      {
-        href: "/accounting/journal-entries",
-        label: "Journal Entries",
-        icon: Book03Icon,
-      },
-    ],
-  },
-  {
-    href: "/finance-banking",
-    label: "Finance & Banking",
-    icon: BankIcon,
-    children: [
-      {
-        href: "/finance-banking/bank-accounts",
-        label: "Bank Accounts",
-        icon: BankIcon,
-      },
-      {
-        href: "/finance-banking/cash-management",
-        label: "Cash Management",
-        icon: Wallet01Icon,
-      },
-    ],
-  },
-  {
-    href: "/reports",
-    label: "Reports",
-    icon: AnalysisTextLinkIcon,
-  },
-];
-
-function isActive(pathname: string, item: NavItem): boolean {
-  if (item.children) {
-    return item.children.some((child) => pathname.startsWith(child.href));
-  }
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
-
-interface SidebarUser {
-  name: string | null;
-  email: string | null;
-  organization: string | null;
-  role: string | null;
-  accountStatus: string | null;
-}
-
-export function Sidebar({
-  isAdmin = false,
-  user,
-}: {
-  isAdmin?: boolean;
-  user?: SidebarUser;
-}) {
+export function Sidebar({ isAdmin = false, user }: SidebarProps) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     Admin: pathname.startsWith("/admin"),
@@ -172,25 +32,7 @@ export function Sidebar({
     setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
   }
 
-  const items: NavItem[] = isAdmin
-    ? [
-        ...(navItems[0] ? [navItems[0]] : []),
-        {
-          href: "/admin",
-          label: "Admin",
-          icon: Shield01Icon,
-          children: [
-            { href: "/admin/users", label: "Users", icon: UserCheck01Icon },
-            {
-              href: "/admin/organizations",
-              label: "Organizations",
-              icon: Building03Icon,
-            },
-          ],
-        },
-        ...navItems.slice(1),
-      ]
-    : navItems;
+  const items = getNavigationItems(isAdmin);
 
   return (
     <Reveal variant="fade-in" className="sticky top-0 flex h-dvh shrink-0 p-2">

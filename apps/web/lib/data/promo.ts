@@ -1,9 +1,30 @@
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import {
   Analytics01Icon,
   BanknoteIcon,
   InvoiceIcon,
 } from "@hugeicons/core-free-icons";
-import type { Feature } from "@/components/feature-card";
+import type { IconSvgElement } from "@hugeicons/react";
+import type { BeamsProps } from "@/lib/data/beams";
+
+export interface Feature {
+  icon: IconSvgElement;
+  title: string;
+  description: string;
+}
+
+export interface FeatureCardProps {
+  feature: Feature;
+  className?: string;
+}
+
+export interface PromoPanelProps extends ComponentPropsWithoutRef<"div"> {
+  logo?: ReactNode;
+  title: string;
+  description?: string;
+  features?: Feature[];
+  beams?: Partial<BeamsProps>;
+}
 
 export const promoFeatures: Feature[] = [
   {

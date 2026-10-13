@@ -1,14 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
+import type { CollapseProps } from "./types";
 import { SWIFT_TRANSITION } from "./variants";
-
-interface CollapseProps {
-  show: boolean;
-  children: ReactNode;
-  className?: string;
-}
 
 /**
  * Animates a block in and out by height, so content like validation errors or

@@ -1,7 +1,7 @@
 "use client";
 
 import { MotionConfig } from "motion/react";
-import type { ReactNode } from "react";
+import type { MotionProviderProps } from "./types";
 import { ENTER_TRANSITION } from "./variants";
 
 /**
@@ -11,7 +11,7 @@ import { ENTER_TRANSITION } from "./variants";
  * operating system's "reduce motion" setting, while still allowing opacity
  * fades, so the app stays accessible without extra work in each component.
  */
-export function MotionProvider({ children }: { children: ReactNode }) {
+export function MotionProvider({ children }: MotionProviderProps) {
   return (
     <MotionConfig reducedMotion="user" transition={ENTER_TRANSITION}>
       {children}

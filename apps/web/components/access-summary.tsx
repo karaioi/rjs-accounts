@@ -16,12 +16,14 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { FormMessage } from "@/components/auth-message";
 import { approveOrganization, deleteOrganization } from "@/lib/api/actions";
-import type { MeResponse, OrganizationItem } from "@/lib/api/types";
+import type { OrganizationItem } from "@/lib/api/types";
+import { ADMIN_DATE_FORMATTER } from "@/lib/data/admin";
 import {
+  BADGE_TONE_CLASSES,
   accountStatus,
-  type BadgeTone,
   orgRole,
   platformRole,
+  type AccessSummaryProps,
 } from "@/lib/data/roles";
 import {
   BadgeCheckIcon,
@@ -34,31 +36,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-const toneClass: Record<BadgeTone, string> = {
-  success: "border-brand-green/25 bg-brand-green/10 text-brand-green",
-  warning: "border-amber-500/30 bg-amber-500/10 text-amber-700",
-  danger: "border-destructive/25 bg-destructive/10 text-destructive",
-  neutral: "border-black/10 bg-black/5 text-muted-foreground",
-};
-
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeZone: "UTC",
-});
-
 /**
  * Everything the API returned about the signed-in caller: identity, platform
  * role, account status, and their organization roles.
  * For platform admins, displays all organizations across any status with
  * complete management (approve pending, permanently delete from app and Neon Auth).
  */
-export function AccessSummary({
-  me,
-  organizations,
-}: {
-  me: MeResponse;
-  organizations?: OrganizationItem[];
-}) {
+export function AccessSummary({ me, organizations }: AccessSummaryProps) {
   const router = useRouter();
   const platform = platformRole(me.platform_role);
   const status = accountStatus(me.account_status);
@@ -260,9 +244,11 @@ export function AccessSummary({
                           </div>
                           <p className="truncate text-xs text-muted-foreground">
                             Created{" "}
-                            {dateFormatter.format(new Date(org.created_at))}
+                            {ADMIN_DATE_FORMATTER.format(
+                              new Date(org.created_at),
+                            )}
                             {org.approved_at
-                              ? ` · Approved ${dateFormatter.format(new Date(org.approved_at))}`
+                              ? ` · Approved ${ADMIN_DATE_FORMATTER.format(new Date(org.approved_at))}`
                               : ""}
                           </p>
                         </div>
@@ -270,7 +256,7 @@ export function AccessSummary({
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge
                             variant="outline"
-                            className={toneClass[orgStatus.tone]}
+                            className={BADGE_TONE_CLASSES[orgStatus.tone]}
                           >
                             {orgStatus.label}
                           </Badge>
@@ -364,13 +350,15 @@ export function AccessSummary({
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge
                             variant="outline"
-                            className={toneClass.neutral}
+                            className={BADGE_TONE_CLASSES.neutral}
                           >
                             <span className="font-mono">{role.slug}</span>
                           </Badge>
                           <Badge
                             variant="outline"
-                            className={toneClass[membershipStatus.tone]}
+                            className={
+                              BADGE_TONE_CLASSES[membershipStatus.tone]
+                            }
                           >
                             {membershipStatus.label}
                           </Badge>

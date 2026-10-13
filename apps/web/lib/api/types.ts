@@ -52,6 +52,17 @@ export interface OrganizationItem {
   approved_at: string | null;
 }
 
+/** `GET /api/v1/users?status=pending` */
+export interface PendingUser {
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  account_status: string;
+  email_verified: boolean;
+  created_at: string;
+  approved_at: string | null;
+}
+
 /** `GET /api/v1/me` */
 export interface MeResponse {
   user_id: string;

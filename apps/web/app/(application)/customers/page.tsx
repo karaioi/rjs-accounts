@@ -2,13 +2,12 @@ import { redirect } from "next/navigation";
 
 import { apiFetch } from "@/lib/api/server";
 import type { CustomerListResponse } from "@/lib/api/types";
+import type { CustomersPageProps } from "@/lib/data/customers";
 import { Customers } from "./customers";
 
 export default async function CustomersPage({
   searchParams,
-}: {
-  searchParams: Promise<{ page?: string; search?: string }>;
-}) {
+}: CustomersPageProps) {
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const search = params.search ?? "";

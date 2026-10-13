@@ -1,27 +1,12 @@
 "use client";
 
-import { type HTMLMotionProps, motion } from "motion/react";
+import { motion } from "motion/react";
+import type { RevealProps, StaggerItemProps, StaggerProps } from "./types";
 import {
   ENTER_TRANSITION,
-  fadeIn,
-  fadeUp,
-  scaleIn,
+  VARIANTS_BY_VARIANT,
   staggerContainer,
 } from "./variants";
-
-const variantsByVariant = {
-  "fade-up": fadeUp,
-  "fade-in": fadeIn,
-  "scale-in": scaleIn,
-} as const;
-
-export type RevealVariant = keyof typeof variantsByVariant;
-
-interface RevealProps extends HTMLMotionProps<"div"> {
-  variant?: RevealVariant;
-  /** Seconds to wait before animating in. */
-  delay?: number;
-}
 
 /**
  * Animates a single element into view on mount.
@@ -41,7 +26,7 @@ export function Reveal({
     <motion.div
       initial="hidden"
       animate="show"
-      variants={variantsByVariant[variant]}
+      variants={VARIANTS_BY_VARIANT[variant]}
       transition={{ ...ENTER_TRANSITION, delay, ...transition }}
       className={className}
       {...props}
@@ -49,19 +34,6 @@ export function Reveal({
       {children}
     </motion.div>
   );
-}
-
-interface StaggerProps extends HTMLMotionProps<"div"> {
-  /** Seconds between each child's entrance. */
-  stagger?: number;
-  /** Seconds to wait before the first child animates in. */
-  delay?: number;
-  /**
-   * When true this container won't trigger itself — it follows the nearest
-   * motion parent. Use for staggering a nested group as one item of an outer
-   * sequence.
-   */
-  inherit?: boolean;
 }
 
 /** A container whose {@link StaggerItem} children animate in sequence. */
@@ -89,10 +61,6 @@ export function Stagger({
   );
 }
 
-interface StaggerItemProps extends HTMLMotionProps<"div"> {
-  variant?: RevealVariant;
-}
-
 /** A child of {@link Stagger}; inherits the entrance sequence. */
 export function StaggerItem({
   variant = "fade-up",
@@ -103,7 +71,7 @@ export function StaggerItem({
 }: StaggerItemProps) {
   return (
     <motion.div
-      variants={variantsByVariant[variant]}
+      variants={VARIANTS_BY_VARIANT[variant]}
       transition={{ ...ENTER_TRANSITION, ...transition }}
       className={className}
       {...props}

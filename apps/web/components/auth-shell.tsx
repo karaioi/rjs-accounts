@@ -1,7 +1,7 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
 import { Reveal } from "@/components/motion/reveal";
 import { PromoPanel } from "@/components/promo-panel";
+import type { AuthShellProps } from "@/lib/data/auth";
 import { promo } from "@/lib/data/promo";
 
 /**
@@ -9,7 +9,7 @@ import { promo } from "@/lib/data/promo";
  * pending approval — so they stay visually identical: brand panel on the left,
  * form column on the right.
  */
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({ children }: AuthShellProps) {
   return (
     <div className="h-screen w-screen flex justify-between items-center">
       <PromoPanel

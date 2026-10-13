@@ -5,22 +5,16 @@ import {
   CheckmarkCircle02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { ReactNode } from "react";
 import { Reveal } from "@/components/motion/reveal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { FormMessageProps } from "@/lib/data/auth";
 
 /**
  * Inline form feedback shared by the auth screens, built on the shadcn `Alert`.
  * Errors announce themselves to assistive tech; success messages are a polite
  * status.
  */
-export function FormMessage({
-  tone,
-  children,
-}: {
-  tone: "error" | "success";
-  children: ReactNode;
-}) {
+export function FormMessage({ tone, children }: FormMessageProps) {
   const isError = tone === "error";
 
   return (

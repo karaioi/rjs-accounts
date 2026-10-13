@@ -13,7 +13,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { FormMessage } from "@/components/auth-message";
 import { ErrorDialog } from "@/components/error-dialog";
 import { Collapse } from "@/components/motion/collapse";
@@ -50,24 +50,12 @@ import { consents } from "@/lib/data/consents";
 import { otpSchema } from "@/lib/validations/otp";
 import { type SignUpValues, signUpSchema } from "@/lib/validations/sign-up";
 
-type Step = "details" | "otp" | "pending";
-
-function StepShell({ children }: { children: ReactNode }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      transition={SPRING_SOFT}
-    >
-      {children}
-    </motion.div>
-  );
-}
+import type { SignUpStep } from "@/lib/data/auth";
+import { StepShell } from "./step-shell";
 
 export function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
-  const [step, setStep] = useState<Step>("details");
+  const [step, setStep] = useState<SignUpStep>("details");
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

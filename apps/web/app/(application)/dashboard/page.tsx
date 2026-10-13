@@ -6,14 +6,11 @@ import { AccessSummary } from "@/components/access-summary";
 import { Reveal } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/server";
-import type { MeResponse, OrganizationItem } from "@/lib/api/types";
-
-interface PendingUser {
-  user_id: string;
-  email: string | null;
-  name: string | null;
-  account_status: string;
-}
+import type {
+  MeResponse,
+  OrganizationItem,
+  PendingUser,
+} from "@/lib/api/types";
 
 export default async function DashboardPage() {
   const response = await apiFetch("/api/v1/me");

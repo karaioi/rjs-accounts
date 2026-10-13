@@ -5,34 +5,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
 import { AnimatePresence, motion } from "motion/react";
 import { SPRING_POP } from "@/components/motion/variants";
-
-const passwordRules: { test: (value: string) => boolean; label: string }[] = [
-  {
-    test: (value) => value.length >= 8,
-    label: "At least 8 characters",
-  },
-  {
-    test: (value) => /[A-Z]/.test(value),
-    label: "At least one uppercase letter",
-  },
-  {
-    test: (value) => /[a-z]/.test(value),
-    label: "At least one lowercase letter",
-  },
-  {
-    test: (value) => /[0-9]/.test(value),
-    label: "At least one number",
-  },
-  {
-    test: (value) => /[^A-Za-z0-9]/.test(value),
-    label: "At least one special character",
-  },
-];
-
-interface PasswordRequirementsProps {
-  value: string;
-  className?: string;
-}
+import {
+  PASSWORD_RULES,
+  type PasswordRequirementsProps,
+} from "@/lib/data/password";
 
 export function PasswordRequirements({
   value,
@@ -40,7 +16,7 @@ export function PasswordRequirements({
 }: PasswordRequirementsProps) {
   return (
     <ul className={cn("flex flex-col gap-1 text-sm", className)}>
-      {passwordRules.map((rule) => {
+      {PASSWORD_RULES.map((rule) => {
         const satisfied = rule.test(value);
 
         return (

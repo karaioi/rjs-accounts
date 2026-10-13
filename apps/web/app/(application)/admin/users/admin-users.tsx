@@ -32,33 +32,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { decideUser, deleteUser } from "@/lib/api/actions";
+import type { PendingUser } from "@/lib/api/types";
+import {
+  ADMIN_DATE_FORMATTER,
+  type AdminUsersProps,
+  type PendingUserAction,
+} from "@/lib/data/admin";
 
-export interface PendingUser {
-  user_id: string;
-  email: string | null;
-  name: string | null;
-  account_status: string;
-  email_verified: boolean;
-  created_at: string;
-  approved_at: string | null;
-}
-
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeZone: "UTC",
-});
-
-interface PendingAction {
-  user: PendingUser;
-  type: "approve" | "reject" | "delete";
-}
-
-export function AdminUsers({ users }: { users: PendingUser[] | null }) {
+export function AdminUsers({ users }: AdminUsersProps) {
   const router = useRouter();
   const [queue, setQueue] = useState<PendingUser[]>(users ?? []);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
+  const [pendingAction, setPendingAction] = useState<PendingUserAction | null>(
     null,
   );
 
@@ -217,7 +203,9 @@ export function AdminUsers({ users }: { users: PendingUser[] | null }) {
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Requested{" "}
-                          {dateFormatter.format(new Date(user.created_at))}
+                          {ADMIN_DATE_FORMATTER.format(
+                            new Date(user.created_at),
+                          )}
                           {user.email_verified ? " · email verified" : ""}
                         </p>
                       </div>
