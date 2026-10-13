@@ -1,23 +1,24 @@
 "use client";
 
 import {
+  AnalysisTextLinkIcon,
+  AnalyticsUpIcon,
+  BadgeIndianRupeeIcon,
   BankIcon,
-  BookIcon,
-  Building03Icon,
-  CalculatorIcon,
-  CashIcon,
-  ChartIcon,
+  Book03Icon,
+  CalculateIcon,
   ChevronDownIcon,
-  DashboardSquare01Icon,
+  DashboardCircleIcon,
   DocumentCodeIcon,
   ListIcon,
-  Money01Icon,
   Package01Icon,
   Receipt,
   Search01Icon,
   ShoppingBag01Icon,
-  ShoppingCart01Icon,
+  TrendingUpIcon,
   UnfoldMoreDownIcon,
+  UserIcon,
+  Wallet01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { motion } from "motion/react";
@@ -27,12 +28,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Collapse } from "@/components/motion/collapse";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import {
-  Popover,
-  PopoverPopup,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { SignOutButton } from "@/components/sign-out-button";
+import { Popover, PopoverPopup, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "./ui/button";
 
 interface NavItem {
@@ -47,12 +44,12 @@ const navItems: NavItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
-    icon: DashboardSquare01Icon,
+    icon: DashboardCircleIcon,
   },
   {
     href: "/customers",
     label: "Customers",
-    icon: Building03Icon,
+    icon: UserIcon,
   },
   {
     href: "/products",
@@ -62,11 +59,19 @@ const navItems: NavItem[] = [
   {
     href: "/sales",
     label: "Sales",
-    icon: ShoppingCart01Icon,
+    icon: AnalyticsUpIcon,
     children: [
-      { href: "/sales/quotations", label: "Quotations", icon: DocumentCodeIcon },
+      {
+        href: "/sales/quotations",
+        label: "Quotations",
+        icon: DocumentCodeIcon,
+      },
       { href: "/sales/invoices", label: "Invoices", icon: Receipt },
-      { href: "/sales/payments-received", label: "Payments Received", icon: Money01Icon },
+      {
+        href: "/sales/payments-received",
+        label: "Payments Received",
+        icon: TrendingUpIcon,
+      },
     ],
   },
   {
@@ -74,23 +79,39 @@ const navItems: NavItem[] = [
     label: "Purchases",
     icon: ShoppingBag01Icon,
     children: [
-      { href: "/purchases/purchase-orders", label: "Purchase Orders", icon: DocumentCodeIcon },
-      { href: "/purchases/purchase-bills", label: "Purchase Bills", icon: Receipt },
-      { href: "/purchases/payments-made", label: "Payments Made", icon: Money01Icon },
+      {
+        href: "/purchases/purchase-orders",
+        label: "Purchase Orders",
+        icon: DocumentCodeIcon,
+      },
+      {
+        href: "/purchases/purchase-bills",
+        label: "Purchase Bills",
+        icon: Receipt,
+      },
+      {
+        href: "/purchases/payments-made",
+        label: "Payments Made",
+        icon: TrendingUpIcon,
+      },
     ],
   },
   {
     href: "/expenses",
     label: "Expenses",
-    icon: Money01Icon,
+    icon: BadgeIndianRupeeIcon,
   },
   {
     href: "/accounting",
     label: "Accounting",
-    icon: CalculatorIcon,
+    icon: CalculateIcon,
     children: [
       { href: "/accounting/entries", label: "Entries", icon: ListIcon },
-      { href: "/accounting/journal-entries", label: "Journal Entries", icon: BookIcon },
+      {
+        href: "/accounting/journal-entries",
+        label: "Journal Entries",
+        icon: Book03Icon,
+      },
     ],
   },
   {
@@ -98,14 +119,22 @@ const navItems: NavItem[] = [
     label: "Finance & Banking",
     icon: BankIcon,
     children: [
-      { href: "/finance-banking/bank-accounts", label: "Bank Accounts", icon: BankIcon },
-      { href: "/finance-banking/cash-management", label: "Cash Management", icon: CashIcon },
+      {
+        href: "/finance-banking/bank-accounts",
+        label: "Bank Accounts",
+        icon: BankIcon,
+      },
+      {
+        href: "/finance-banking/cash-management",
+        label: "Cash Management",
+        icon: Wallet01Icon,
+      },
     ],
   },
   {
     href: "/reports",
     label: "Reports",
-    icon: ChartIcon,
+    icon: AnalysisTextLinkIcon,
   },
 ];
 
@@ -140,7 +169,7 @@ export function Sidebar({
 
   return (
     <Reveal variant="fade-in" className="sticky top-0 flex h-dvh shrink-0 p-2">
-      <div className="flex w-72 flex-col rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="flex w-72 flex-col rounded-3xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Header — logo + search */}
         <div className="flex items-center justify-between p-4">
           <Link href="/dashboard">
@@ -155,7 +184,7 @@ export function Sidebar({
           </Link>
           <Button
             type="button"
-            className="bg-white text-black size-8 rounded-full"
+            className="bg-white text-black size-8 rounded-full hover:bg-white"
             aria-label="Search"
           >
             <HugeiconsIcon icon={Search01Icon} size={18} strokeWidth={1.5} />
@@ -290,7 +319,10 @@ export function Sidebar({
                   <p className="text-base font-semibold text-slate-900">
                     {user.name || "Unnamed user"}
                   </p>
-                  <p className="truncate text-sm text-slate-500" title={user.email ?? undefined}>
+                  <p
+                    className="truncate text-sm text-slate-500"
+                    title={user.email ?? undefined}
+                  >
                     {user.email || "No email"}
                   </p>
                 </div>
@@ -303,7 +335,9 @@ export function Sidebar({
                   </div>
                   {user.organization && (
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500">Organization</span>
+                      <span className="text-xs text-slate-500">
+                        Organization
+                      </span>
                       <span className="truncate text-xs font-medium text-slate-900">
                         {user.organization}
                       </span>

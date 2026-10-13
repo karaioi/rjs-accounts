@@ -1,22 +1,9 @@
 "use client";
 
-import {
-  Add01Icon,
-  Building03Icon,
-  RefreshIcon,
-  Search01Icon,
-  UserSearch01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useForm } from "@tanstack/react-form";
-import { AnimatePresence, motion } from "motion/react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
 import { FormMessage } from "@/components/auth-message";
 import { Collapse } from "@/components/motion/collapse";
 import { Reveal } from "@/components/motion/reveal";
 import { SPRING_SOFT } from "@/components/motion/variants";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,7 +20,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -52,20 +38,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { createCustomer } from "@/lib/api/actions";
 import type { Customer } from "@/lib/api/types";
 import {
-  CUSTOMER_DATE_FORMATTER,
-  CUSTOMER_STATUS_TONE,
   CUSTOMER_FIELD_LABELS,
-  CUSTOMER_PLACEHOLDERS,
   CUSTOMER_NO_GSTIN_HINT,
-  CUSTOMER_TABLE_HEADERS,
+  CUSTOMER_PLACEHOLDERS,
+  CUSTOMER_TABLE_HEADERS
 } from "@/lib/data/customers";
 import {
   gstRegisteredSchema,
   gstUnregisteredSchema,
 } from "@/lib/validations/customer";
+import {
+  Add01Icon,
+  Building03Icon,
+  RefreshIcon,
+  Search01Icon,
+  UserSearch01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useForm } from "@tanstack/react-form";
+import { AnimatePresence, motion } from "motion/react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useTransition } from "react";
 
 type GstTab = "registered" | "unregistered";
 
