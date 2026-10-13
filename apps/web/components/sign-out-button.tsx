@@ -17,7 +17,7 @@ import { authClient } from "@/lib/auth/client";
 export function SignOutButton({
   variant = "full",
 }: {
-  variant?: "full" | "icon";
+  variant?: "full" | "icon" | "popover";
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -45,8 +45,25 @@ export function SignOutButton({
         disabled={pending}
         aria-label="Sign out"
         title="Sign out"
+        className="text-white hover:bg-white/10 hover:text-white"
       >
         <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.5} />
+      </Button>
+    );
+  }
+
+  if (variant === "popover") {
+    return (
+      <Button
+        type="button"
+        variant="destructive"
+        size="lg"
+        onClick={signOut}
+        disabled={pending}
+        className="w-full rounded-2xl"
+      >
+        <HugeiconsIcon icon={Logout01Icon} size={16} strokeWidth={1.5} />
+        {pending ? "Signing out..." : "Sign out"}
       </Button>
     );
   }

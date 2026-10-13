@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "bash scripts/start-tunnel.sh && turbo run dev",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check-types": "turbo run check-types"

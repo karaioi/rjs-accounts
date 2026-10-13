@@ -3,8 +3,7 @@
 import {
   Add01Icon,
   Building03Icon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
+  RefreshIcon,
   Search01Icon,
   UserSearch01Icon,
 } from "@hugeicons/core-free-icons";
@@ -34,6 +33,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -57,6 +57,10 @@ import type { Customer } from "@/lib/api/types";
 import {
   CUSTOMER_DATE_FORMATTER,
   CUSTOMER_STATUS_TONE,
+  CUSTOMER_FIELD_LABELS,
+  CUSTOMER_PLACEHOLDERS,
+  CUSTOMER_NO_GSTIN_HINT,
+  CUSTOMER_TABLE_HEADERS,
 } from "@/lib/data/customers";
 import {
   gstRegisteredSchema,
@@ -75,16 +79,16 @@ interface CustomersProps {
 
 export function Customers({
   customers,
-  total,
-  page,
-  totalPages,
+  total: _total,
+  page: _page,
+  totalPages: _totalPages,
   search,
 }: CustomersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   function navigateToPage(newPage: number, newSearch?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -111,7 +115,7 @@ export function Customers({
         <Card className="rounded-3xl border-black/10 bg-[#fffafa]/70">
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-brand-blue/10 text-brand-blue">
+              <span className="grid size-11 shrink-0 place-items-center rounded-3xl bg-brand-blue/10 text-brand-blue">
                 <HugeiconsIcon
                   icon={Building03Icon}
                   size={22}
@@ -131,7 +135,7 @@ export function Customers({
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger
                 render={
-                  <Button className="rounded-xl shadow-lg shadow-brand-green/25">
+                  <Button className="rounded-3xl shadow-lg shadow-brand-green/25">
                     <HugeiconsIcon
                       icon={Add01Icon}
                       size={16}
@@ -166,50 +170,26 @@ export function Customers({
           <CardContent className="flex flex-col gap-4">
             {error && <FormMessage tone="error">{error}</FormMessage>}
 
-            {/* Search */}
-            <div className="relative">
-              <HugeiconsIcon
-                icon={Search01Icon}
-                size={18}
-                strokeWidth={1.5}
-                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                type="search"
-                placeholder="Search by name, slug, or GSTIN…"
-                defaultValue={search}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="h-11 rounded-xl pl-10"
-              />
-            </div>
-
             {/* Table */}
-            <div className="overflow-hidden rounded-2xl border border-black/10">
+            <div className="overflow-hidden rounded-3xl border border-black/10">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-black/[0.03] hover:bg-black/[0.03]">
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>GSTIN</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                    {CUSTOMER_TABLE_HEADERS.map((header) => (
+                      <TableHead key={header}>{header}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <AnimatePresence initial={false}>
-                    {customers.map((customer) => (
+                    {customers.map((customer, index) => (
                       <TableRow key={customer.id}>
-                        <TableCell className="font-medium">
-                          {customer.name}
-                        </TableCell>
-                        <TableCell>
-                          <code className="rounded-md bg-black/5 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                            {customer.slug}
-                          </code>
-                        </TableCell>
+                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-medium">{customer.company_name ?? "—"}</TableCell>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
                         <TableCell>
                           {customer.gstin ? (
-                            <code className="rounded-md bg-black/5 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                            <code className="rounded-3xl bg-black/5 px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                               {customer.gstin}
                             </code>
                           ) : (
@@ -219,19 +199,51 @@ export function Customers({
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              CUSTOMER_STATUS_TONE[customer.status] ??
-                              CUSTOMER_STATUS_TONE.archived
-                            }
-                          >
-                            {customer.status}
-                          </Badge>
+                          {customer.email ? (
+                            <span className="text-xs text-muted-foreground">
+                              {customer.email}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {CUSTOMER_DATE_FORMATTER.format(
-                            new Date(customer.created_at),
+                        <TableCell>
+                          {customer.contact_mobile || customer.contact_telephone ? (
+                            <span className="text-xs text-muted-foreground">
+                              {customer.contact_mobile}
+                              " "
+                              {customer.contact_telephone}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {customer.address1 || customer.address2 ? (
+                            <span className="text-xs text-muted-foreground">
+                              {customer.address1}
+                              " "
+                              {customer.address2}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {customer.opening_balance ? (
+                            <span className="text-xs text-muted-foreground">
+                              {customer.opening_balance}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -257,65 +269,31 @@ export function Customers({
               )}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Page {page} of {totalPages} · {total} total
-                </p>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    disabled={page <= 1 || isPending}
-                    onClick={() => navigateToPage(page - 1)}
-                    aria-label="Previous page"
-                  >
-                    <HugeiconsIcon
-                      icon={ChevronLeftIcon}
-                      size={16}
-                      strokeWidth={1.5}
-                    />
-                  </Button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (pageNum) => (
-                      <Button
-                        key={pageNum}
-                        type="button"
-                        variant={pageNum === page ? "default" : "ghost"}
-                        size="sm"
-                        className="rounded-lg"
-                        disabled={isPending}
-                        onClick={() => navigateToPage(pageNum)}
-                      >
-                        {pageNum}
-                      </Button>
-                    ),
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    disabled={page >= totalPages || isPending}
-                    onClick={() => navigateToPage(page + 1)}
-                    aria-label="Next page"
-                  >
-                    <HugeiconsIcon
-                      icon={ChevronRightIcon}
-                      size={16}
-                      strokeWidth={1.5}
-                    />
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Search */}
+            <div className="relative">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={18}
+                strokeWidth={1.5}
+                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                type="search"
+                placeholder="Search by name or GSTIN…"
+                defaultValue={search}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="h-11 rounded-3xl pl-10"
+              />
+            </div>
+
           </CardContent>
         </Card>
       </Reveal>
     </div>
   );
 }
+
+export default Customers;
 
 function AddCustomerForm({
   onDone,
@@ -329,10 +307,7 @@ function AddCustomerForm({
 
   const form = useForm({
     defaultValues: {
-      name: "",
-      slug: "",
       gstin: "",
-      customerName: "",
       companyName: "",
       location: "",
       address1: "",
@@ -343,6 +318,8 @@ function AddCustomerForm({
       contactMobile: "",
       contactTelephone: "",
       openingBalance: "",
+      placeOfSupply: "",
+      phone: "",
       openingBalanceType: "credit" as "credit" | "debit",
     },
     validators: {
@@ -351,23 +328,27 @@ function AddCustomerForm({
     },
     onSubmit: async ({ value }) => {
       setPending(true);
-      try {
-        const result = await createCustomer({
-          name: value.customerName || value.name,
-          slug: value.slug,
-          gstin: gstTab === "registered" ? value.gstin : undefined,
-          companyName: value.companyName,
-          location: value.location,
-          address1: value.address1,
-          address2: value.address2,
-          pincode: value.pincode,
-          state: value.state,
-          email: value.email,
-          contactMobile: value.contactMobile,
-          contactTelephone: value.contactTelephone,
-          openingBalance: value.openingBalance,
-          openingBalanceType: value.openingBalanceType,
-        });
+      try {          const bodyWithGstin = gstTab === "registered"
+            ? { ...value, gstin: value.gstin }
+            : { ...value, gstin: undefined };
+
+          const result = await createCustomer({
+            name: bodyWithGstin.companyName,
+            gstin: bodyWithGstin.gstin,
+            companyName: bodyWithGstin.companyName,
+            location: bodyWithGstin.location,
+            address1: bodyWithGstin.address1,
+            address2: bodyWithGstin.address2,
+            pincode: bodyWithGstin.pincode,
+            state: bodyWithGstin.state,
+            email: bodyWithGstin.email,
+            contactMobile: bodyWithGstin.contactMobile,
+            contactTelephone: bodyWithGstin.contactTelephone,
+            openingBalance: bodyWithGstin.openingBalance,
+            openingBalanceType: bodyWithGstin.openingBalanceType,
+            placeOfSupply: bodyWithGstin.placeOfSupply,
+            phone: bodyWithGstin.phone,
+          });
 
         if (!result.ok) {
           onError(result.message);
@@ -382,15 +363,6 @@ function AddCustomerForm({
       }
     },
   });
-
-  function generateSlug(name: string) {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60);
-  }
 
   return (
     <form
@@ -420,7 +392,7 @@ function AddCustomerForm({
                   field.state.meta.isTouched && !field.state.meta.isValid;
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>GSTIN</FieldLabel>
+                    <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.gstin}</FieldLabel>
                     <Input
                       id={field.name}
                       name={field.name}
@@ -428,8 +400,8 @@ function AddCustomerForm({
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value)}
                       aria-invalid={isInvalid}
-                      placeholder="27AABCU9603R1ZX"
-                      className="h-11 rounded-xl font-mono"
+                      placeholder={CUSTOMER_PLACEHOLDERS.gstin}
+                      className="h-11 rounded-3xl font-mono"
                     />
                     <Collapse show={isInvalid}>
                       <FieldError errors={field.state.meta.errors} />
@@ -443,75 +415,19 @@ function AddCustomerForm({
 
         <TabsContent value="unregistered" className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">
-            No GSTIN required. Fill in the remaining details below.
+            {CUSTOMER_NO_GSTIN_HINT}
           </p>
         </TabsContent>
       </Tabs>
 
       <FieldGroup className="gap-4">
-        <form.Field name="customerName">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Customer Name</FieldLabel>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => {
-                    field.handleChange(e.target.value);
-                    const slugField = form.getFieldMeta("slug");
-                    if (slugField && !slugField.isTouched) {
-                      form.setFieldValue("slug", generateSlug(e.target.value));
-                    }
-                  }}
-                  aria-invalid={isInvalid}
-                  placeholder="Acme Corporation"
-                  className="h-11 rounded-xl"
-                />
-                <Collapse show={isInvalid}>
-                  <FieldError errors={field.state.meta.errors} />
-                </Collapse>
-              </Field>
-            );
-          }}
-        </form.Field>
-
-        <form.Field name="slug">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
-            return (
-              <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Slug</FieldLabel>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  aria-invalid={isInvalid}
-                  placeholder="acme-corp"
-                  className="h-11 rounded-xl font-mono"
-                />
-                <Collapse show={isInvalid}>
-                  <FieldError errors={field.state.meta.errors} />
-                </Collapse>
-              </Field>
-            );
-          }}
-        </form.Field>
-
         <form.Field name="companyName">
           {(field) => {
             const isInvalid =
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Company Name</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.companyName}</FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -519,8 +435,8 @@ function AddCustomerForm({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   aria-invalid={isInvalid}
-                  placeholder="Acme Pvt. Ltd."
-                  className="h-11 rounded-xl"
+                  placeholder={CUSTOMER_PLACEHOLDERS.companyName}
+                  className="h-11 rounded-3xl"
                 />
                 <Collapse show={isInvalid}>
                   <FieldError errors={field.state.meta.errors} />
@@ -536,7 +452,7 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Location</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.location}</FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -544,8 +460,8 @@ function AddCustomerForm({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   aria-invalid={isInvalid}
-                  placeholder="Mumbai"
-                  className="h-11 rounded-xl"
+                  placeholder={CUSTOMER_PLACEHOLDERS.location}
+                  className="h-11 rounded-3xl"
                 />
                 <Collapse show={isInvalid}>
                   <FieldError errors={field.state.meta.errors} />
@@ -561,16 +477,16 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Address Line 1</FieldLabel>
-                <Input
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.address1}</FieldLabel>
+                <Textarea
                   id={field.name}
                   name={field.name}
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   aria-invalid={isInvalid}
-                  placeholder="123, Main Road"
-                  className="h-11 rounded-xl"
+                  placeholder={CUSTOMER_PLACEHOLDERS.address1}
+                  className="min-h-20 rounded-3xl resize-y"
                 />
                 <Collapse show={isInvalid}>
                   <FieldError errors={field.state.meta.errors} />
@@ -586,7 +502,32 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Address Line 2</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.address2}</FieldLabel>
+                <Textarea
+                  id={field.name}
+                  name={field.name}
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  aria-invalid={isInvalid}
+                  placeholder={CUSTOMER_PLACEHOLDERS.address2}
+                  className="min-h-20 rounded-3xl resize-y"
+                />
+                <Collapse show={isInvalid}>
+                  <FieldError errors={field.state.meta.errors} />
+                </Collapse>
+              </Field>
+            );
+          }}
+        </form.Field>
+
+        <form.Field name="placeOfSupply">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid;
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.placeOfSupply}</FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -594,8 +535,34 @@ function AddCustomerForm({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   aria-invalid={isInvalid}
-                  placeholder="Andheri East"
-                  className="h-11 rounded-xl"
+                  placeholder={CUSTOMER_PLACEHOLDERS.placeOfSupply}
+                  className="h-11 rounded-3xl"
+                />
+                <Collapse show={isInvalid}>
+                  <FieldError errors={field.state.meta.errors} />
+                </Collapse>
+              </Field>
+            );
+          }}
+        </form.Field>
+
+        <form.Field name="phone">
+          {(field) => {
+            const isInvalid =
+              field.state.meta.isTouched && !field.state.meta.isValid;
+            return (
+              <Field data-invalid={isInvalid}>
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.phone}</FieldLabel>
+                <Input
+                  id={field.name}
+                  name={field.name}
+                  type="tel"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => field.handleChange(e.target.value)}
+                  aria-invalid={isInvalid}
+                  placeholder={CUSTOMER_PLACEHOLDERS.phone}
+                  className="h-11 rounded-3xl"
                 />
                 <Collapse show={isInvalid}>
                   <FieldError errors={field.state.meta.errors} />
@@ -612,7 +579,7 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Pincode</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.pincode}</FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -620,8 +587,8 @@ function AddCustomerForm({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
-                    placeholder="400069"
-                    className="h-11 rounded-xl"
+                    placeholder={CUSTOMER_PLACEHOLDERS.pincode}
+                    className="h-11 rounded-3xl"
                   />
                   <Collapse show={isInvalid}>
                     <FieldError errors={field.state.meta.errors} />
@@ -637,7 +604,7 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>State</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.state}</FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -645,8 +612,8 @@ function AddCustomerForm({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
-                    placeholder="Maharashtra"
-                    className="h-11 rounded-xl"
+                    placeholder={CUSTOMER_PLACEHOLDERS.state}
+                    className="h-11 rounded-3xl"
                   />
                   <Collapse show={isInvalid}>
                     <FieldError errors={field.state.meta.errors} />
@@ -663,7 +630,7 @@ function AddCustomerForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.email}</FieldLabel>
                 <Input
                   id={field.name}
                   name={field.name}
@@ -672,8 +639,8 @@ function AddCustomerForm({
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   aria-invalid={isInvalid}
-                  placeholder="contact@acme.com"
-                  className="h-11 rounded-xl"
+                  placeholder={CUSTOMER_PLACEHOLDERS.email}
+                  className="h-11 rounded-3xl"
                 />
                 <Collapse show={isInvalid}>
                   <FieldError errors={field.state.meta.errors} />
@@ -690,7 +657,7 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Contact (Mobile)</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.contactMobile}</FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -699,8 +666,8 @@ function AddCustomerForm({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
-                    placeholder="9876543210"
-                    className="h-11 rounded-xl"
+                    placeholder={CUSTOMER_PLACEHOLDERS.contactMobile}
+                    className="h-11 rounded-3xl"
                   />
                   <Collapse show={isInvalid}>
                     <FieldError errors={field.state.meta.errors} />
@@ -717,7 +684,7 @@ function AddCustomerForm({
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
-                    Contact (Telephone)
+                    {CUSTOMER_FIELD_LABELS.contactTelephone}
                   </FieldLabel>
                   <Input
                     id={field.name}
@@ -727,8 +694,8 @@ function AddCustomerForm({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
-                    placeholder="022-12345678"
-                    className="h-11 rounded-xl"
+                    placeholder={CUSTOMER_PLACEHOLDERS.contactTelephone}
+                    className="h-11 rounded-3xl"
                   />
                   <Collapse show={isInvalid}>
                     <FieldError errors={field.state.meta.errors} />
@@ -746,7 +713,7 @@ function AddCustomerForm({
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
                 <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Opening Balance</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.openingBalance}</FieldLabel>
                   <Input
                     id={field.name}
                     name={field.name}
@@ -756,8 +723,8 @@ function AddCustomerForm({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     aria-invalid={isInvalid}
-                    placeholder="0.00"
-                    className="h-11 rounded-xl"
+                    placeholder={CUSTOMER_PLACEHOLDERS.openingBalance}
+                    className="h-11 rounded-3xl"
                   />
                   <Collapse show={isInvalid}>
                     <FieldError errors={field.state.meta.errors} />
@@ -771,13 +738,13 @@ function AddCustomerForm({
             {(field) => {
               return (
                 <Field>
-                  <FieldLabel htmlFor={field.name}>Type</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>{CUSTOMER_FIELD_LABELS.openingBalanceType}</FieldLabel>
                   <Select
                     value={field.state.value}
                     onChange={(e) =>
                       field.handleChange(e.target.value as "credit" | "debit")
                     }
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-3xl"
                   >
                     <option value="credit">Credit</option>
                     <option value="debit">Debit</option>
@@ -792,12 +759,13 @@ function AddCustomerForm({
       <SheetFooter className="mt-2">
         <Button
           type="button"
-          variant="ghost"
-          className="rounded-xl"
+          variant="outline"
+          className="rounded-3xl"
           onClick={() => form.reset()}
           disabled={pending}
         >
-          Reset
+          <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.5} />
+          {pending ? "Resetting…" : "Reset"}
         </Button>
         <motion.div
           whileHover={{ scale: 1.01 }}
@@ -807,9 +775,10 @@ function AddCustomerForm({
           <Button
             type="submit"
             form="add-customer-form"
-            className="rounded-xl shadow-lg shadow-brand-green/25"
+            className="rounded-3xl shadow-lg shadow-brand-green/25"
             disabled={pending}
           >
+            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.5} />
             {pending ? "Creating…" : "Create customer"}
           </Button>
         </motion.div>
@@ -817,3 +786,4 @@ function AddCustomerForm({
     </form>
   );
 }
+

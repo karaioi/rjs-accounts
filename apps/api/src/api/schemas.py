@@ -74,6 +74,20 @@ class CustomerOut(BaseModel):
     name: str
     slug: str
     status: str
+    gstin: str | None = None
+    company_name: str | None = None
+    location: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    pincode: str | None = None
+    state: str | None = None
+    email: str | None = None
+    contact_mobile: str | None = None
+    contact_telephone: str | None = None
+    opening_balance: str | None = None
+    opening_balance_type: str | None = None
+    place_of_supply: str | None = None
+    phone: str | None = None
     created_at: datetime
     approved_at: datetime | None
 
@@ -81,6 +95,20 @@ class CustomerOut(BaseModel):
 class CustomerCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str = Field(min_length=1, max_length=60, pattern=r"^[a-z0-9-]+$")
+    gstin: str | None = None
+    company_name: str | None = None
+    location: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    pincode: str | None = None
+    state: str | None = None
+    email: str | None = None
+    contact_mobile: str | None = None
+    contact_telephone: str | None = None
+    opening_balance: str | None = None
+    opening_balance_type: str | None = None
+    place_of_supply: str | None = None
+    phone: str | None = None
 
 
 class OrganizationOut(BaseModel):

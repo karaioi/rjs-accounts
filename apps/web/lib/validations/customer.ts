@@ -6,25 +6,6 @@ import * as z from "zod";
  * Two variants: GST-registered (includes GSTIN) and GST-unregistered (no GSTIN).
  */
 const baseFields = {
-  name: z
-    .string()
-    .trim()
-    .min(1, "Customer name is required.")
-    .max(120, "Customer name must be 120 characters or fewer."),
-  slug: z
-    .string()
-    .trim()
-    .min(1, "Slug is required.")
-    .max(60, "Slug must be 60 characters or fewer.")
-    .regex(
-      /^[a-z0-9-]+$/,
-      "Slug may only contain lowercase letters, numbers, and hyphens.",
-    ),
-  customerName: z
-    .string()
-    .trim()
-    .min(1, "Customer name is required.")
-    .max(120, "Customer name must be 120 characters or fewer."),
   companyName: z.string().trim().min(1, "Company name is required."),
   location: z.string().trim().min(1, "Location is required."),
   address1: z.string().trim().min(1, "Address is required."),
@@ -49,6 +30,8 @@ const baseFields = {
     .trim()
     .regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount."),
   openingBalanceType: z.enum(["credit", "debit"]),
+  placeOfSupply: z.string().trim(),
+  phone: z.string().trim(),
 };
 
 export const gstRegisteredSchema = z.object({
@@ -65,6 +48,7 @@ export const gstRegisteredSchema = z.object({
 export const gstUnregisteredSchema = z.object({
   gstin: z.string().trim(),
   ...baseFields,
+  phone: z.string().trim(),
 });
 
-export type CustomerValues = z.infer<typeof gstRegisteredSchema>;
+export type CustomerValues = typeof baseFields;

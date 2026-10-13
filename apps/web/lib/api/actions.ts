@@ -70,7 +70,6 @@ export async function decideUser(input: {
 /** Create a customer (platform admins only). */
 export async function createCustomer(input: {
   name: string;
-  slug: string;
   gstin?: string;
   companyName?: string;
   location?: string;
@@ -83,12 +82,13 @@ export async function createCustomer(input: {
   contactTelephone?: string;
   openingBalance?: string;
   openingBalanceType?: "credit" | "debit";
+  placeOfSupply?: string;
+  phone?: string;
 }): Promise<ActionResult> {
   const response = await apiFetch("/api/v1/customers", {
     method: "POST",
     body: JSON.stringify({
       name: input.name,
-      slug: input.slug,
       gstin: input.gstin || null,
       company_name: input.companyName || null,
       location: input.location || null,
@@ -101,6 +101,8 @@ export async function createCustomer(input: {
       contact_telephone: input.contactTelephone || null,
       opening_balance: input.openingBalance || null,
       opening_balance_type: input.openingBalanceType || null,
+      place_of_supply: input.placeOfSupply || null,
+      phone: input.phone || null,
     }),
   });
 

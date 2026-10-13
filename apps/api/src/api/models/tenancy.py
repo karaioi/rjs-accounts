@@ -67,6 +67,21 @@ class Customer(TimestampsMixin, Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    gstin: Mapped[str | None] = mapped_column(Text)
+    company_name: Mapped[str | None] = mapped_column(Text)
+    location: Mapped[str | None] = mapped_column(Text)
+    address1: Mapped[str | None] = mapped_column(Text)
+    address2: Mapped[str | None] = mapped_column(Text)
+    pincode: Mapped[str | None] = mapped_column(Text)
+    state: Mapped[str | None] = mapped_column(Text)
+    email: Mapped[str | None] = mapped_column(Text)
+    contact_mobile: Mapped[str | None] = mapped_column(Text)
+    contact_telephone: Mapped[str | None] = mapped_column(Text)
+    opening_balance: Mapped[str | None] = mapped_column(Text)
+    opening_balance_type: Mapped[str | None] = mapped_column(Text)
+    place_of_supply: Mapped[str | None] = mapped_column(Text)
+    phone: Mapped[str | None] = mapped_column(Text)
+
     organizations: Mapped[list[Organization]] = relationship(
         back_populates="customer", cascade="all, delete-orphan"
     )

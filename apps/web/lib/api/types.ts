@@ -4,7 +4,6 @@
 export interface Customer {
   id: string;
   name: string;
-  slug: string;
   status: string;
   gstin: string | null;
   company_name: string | null;
@@ -18,6 +17,8 @@ export interface Customer {
   contact_telephone: string | null;
   opening_balance: string | null;
   opening_balance_type: "credit" | "debit" | null;
+  place_of_supply: string | null;
+  phone: string | null;
   created_at: string;
   approved_at: string | null;
 }

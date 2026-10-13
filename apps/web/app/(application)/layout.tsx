@@ -18,9 +18,20 @@ export default async function ApplicationLayout({
   }
 
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar isAdmin={me.is_platform_admin} />
-      <main className="flex-1 bg-gray-50">{children}</main>
+    <div className="flex h-dvh bg-[#f5f5f5]">
+      <Sidebar
+        isAdmin={me.is_platform_admin}
+        user={{
+          name: me.name,
+          email: me.email,
+          organization: me.memberships[0]?.organization_name ?? null,
+          role: me.is_platform_admin ? "Platform Admin" : (me.memberships[0]?.role_slug ?? "User"),
+          accountStatus: me.account_status,
+        }}
+      />
+      <main className="flex-1 overflow-y-auto scroll-smooth">
+        {children}
+      </main>
     </div>
   );
 }
