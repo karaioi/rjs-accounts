@@ -34,7 +34,7 @@ app/
   (login)/login/            # two-step sign-in (password → email OTP)
   (login)/sign-up/          # self-service sign-up (email-verified → pending)
   (login)/pending/          # "awaiting approval" screen
-  (application)/layout.tsx  # signed-in shell (header + sign out)
+  (application)/layout.tsx  # signed-in shell (sidebar + sign out)
   (application)/dashboard/  # "Your access" summary (identity + roles) + admin link
   (application)/admin/users/  # platform-admin approval queue
   api/auth/[...path]/       # Neon Auth proxy route (+ rate limiting for auth calls)

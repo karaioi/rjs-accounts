@@ -2,9 +2,9 @@
 
 import { MinusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 import { OTPInput, OTPInputContext } from "input-otp";
 import * as React from "react";
-import { cn } from "cn";
 
 function InputOTP({
   className,
@@ -83,4 +83,4 @@ function InputOTPSeparator({ ...props }: React.ComponentProps<"div">) {
   );
 }
 
-export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator };
+export { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot };

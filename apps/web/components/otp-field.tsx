@@ -1,13 +1,13 @@
 "use client";
 
+import { cn } from "cn";
+import { Fragment } from "react";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { cn } from "cn";
-import { Fragment } from "react";
 
 /**
  * A 6-digit code as the shadcn `InputOTP`. The slots are split into three

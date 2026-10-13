@@ -13,7 +13,6 @@ import { useState } from "react";
 import { FormMessage } from "@/components/auth-message";
 import { Reveal } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
-import { decideUser } from "@/lib/api/actions";
 import {
   Card,
   CardContent,
@@ -21,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { decideUser } from "@/lib/api/actions";
 
 export interface PendingUser {
   user_id: string;
@@ -74,7 +74,7 @@ export function AdminUsers({ users }: { users: PendingUser[] | null }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-8">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
       <Reveal variant="fade-up">
         <Card className="rounded-3xl border-black/10 bg-[#fffafa]/70">
           <CardHeader>

@@ -66,3 +66,59 @@ export async function decideUser(input: {
 
   return { ok: true };
 }
+
+/** Create a customer (platform admins only). */
+export async function createCustomer(input: {
+  name: string;
+  slug: string;
+  gstin?: string;
+  companyName?: string;
+  location?: string;
+  address1?: string;
+  address2?: string;
+  pincode?: string;
+  state?: string;
+  email?: string;
+  contactMobile?: string;
+  contactTelephone?: string;
+  openingBalance?: string;
+  openingBalanceType?: "credit" | "debit";
+}): Promise<ActionResult> {
+  const response = await apiFetch("/api/v1/customers", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      slug: input.slug,
+      gstin: input.gstin || null,
+      company_name: input.companyName || null,
+      location: input.location || null,
+      address1: input.address1 || null,
+      address2: input.address2 || null,
+      pincode: input.pincode || null,
+      state: input.state || null,
+      email: input.email || null,
+      contact_mobile: input.contactMobile || null,
+      contact_telephone: input.contactTelephone || null,
+      opening_balance: input.openingBalance || null,
+      opening_balance_type: input.openingBalanceType || null,
+    }),
+  });
+
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+  if (!response.ok) {
+    let message = "Could not create that customer. Please try again.";
+    try {
+      const data = await response.json();
+      if (data?.detail) {
+        message = typeof data.detail === "string" ? data.detail : message;
+      }
+    } catch {
+      // Response body wasn't JSON — keep the default message.
+    }
+    return { ok: false, message };
+  }
+
+  return { ok: true };
+}

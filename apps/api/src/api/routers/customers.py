@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,15 +17,38 @@ from ..services.audit import write_audit
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
+MAX_PAGE_SIZE = 100
+DEFAULT_PAGE_SIZE = 20
 
-@router.get("", response_model=list[CustomerOut])
+
+@router.get("")
 def list_customers(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)."),
+    page_size: int = Query(
+        DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Items per page."
+    ),
     _: Principal = Depends(require_platform_admin),
     session: Session = Depends(get_session),
-) -> list[Customer]:
-    return list(
-        session.execute(select(Customer).order_by(Customer.name)).scalars().all()
+) -> dict:
+    """List customers with pagination. Platform admin only."""
+    total = session.execute(
+        select(func.count()).select_from(Customer)
+    ).scalar_one()
+    items = list(
+        session.execute(
+            select(Customer)
+            .order_by(Customer.name)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).scalars().all()
     )
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size,
+    }
 
 
 @router.post("", response_model=CustomerOut, status_code=status.HTTP_201_CREATED)

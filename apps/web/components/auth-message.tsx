@@ -6,8 +6,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Reveal } from "@/components/motion/reveal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 /**
  * Inline form feedback shared by the auth screens, built on the shadcn `Alert`.

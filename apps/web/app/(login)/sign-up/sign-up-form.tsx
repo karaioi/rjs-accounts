@@ -43,10 +43,10 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { registerAccount } from "@/lib/api/actions";
 import { authClient } from "@/lib/auth/client";
 import { describeAuthError } from "@/lib/auth/errors";
 import { consents } from "@/lib/data/consents";
-import { registerAccount } from "@/lib/api/actions";
 import { otpSchema } from "@/lib/validations/otp";
 import { type SignUpValues, signUpSchema } from "@/lib/validations/sign-up";
 

@@ -14,7 +14,11 @@ import { authClient } from "@/lib/auth/client";
  * This is the only way back to `/login`: the Proxy hides the sign-in and
  * sign-up pages for as long as a session exists.
  */
-export function SignOutButton() {
+export function SignOutButton({
+  variant = "full",
+}: {
+  variant?: "full" | "icon";
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -29,6 +33,22 @@ export function SignOutButton() {
     await cancelSignIn();
     router.replace("/login");
     router.refresh();
+  }
+
+  if (variant === "icon") {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        onClick={signOut}
+        disabled={pending}
+        aria-label="Sign out"
+        title="Sign out"
+      >
+        <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.5} />
+      </Button>
+    );
   }
 
   return (

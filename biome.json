@@ -25,6 +25,26 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/web/lib/auth/client.ts"],
+      "assist": {
+        "actions": {
+          "source": {
+            "organizeImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/web/components/sidebar.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      }
     }
   ],
   "css": {

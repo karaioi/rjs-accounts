@@ -1,5 +1,36 @@
 /** Response shapes the web app consumes from the FastAPI backend. */
 
+/** `GET /api/v1/customers` */
+export interface Customer {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  gstin: string | null;
+  company_name: string | null;
+  location: string | null;
+  address1: string | null;
+  address2: string | null;
+  pincode: string | null;
+  state: string | null;
+  email: string | null;
+  contact_mobile: string | null;
+  contact_telephone: string | null;
+  opening_balance: string | null;
+  opening_balance_type: "credit" | "debit" | null;
+  created_at: string;
+  approved_at: string | null;
+}
+
+/** `GET /api/v1/customers` — paginated response */
+export interface CustomerListResponse {
+  items: Customer[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
 export interface Membership {
   organization_id: string;
   organization_name: string;
