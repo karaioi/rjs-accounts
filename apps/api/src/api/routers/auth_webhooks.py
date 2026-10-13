@@ -26,6 +26,7 @@ from ..auth.webhooks import WebhookVerifier, get_webhook_verifier
 from ..config import get_settings
 from ..emails import Email, render_magic_link_email, render_otp_email
 from ..mailer import MailDeliveryError, send_email
+from ..services.rate_limit import enforce
 
 logger = logging.getLogger("api.auth_webhooks")
 
@@ -47,6 +48,13 @@ async def neon_auth_webhook(
     Verification failures are 401 (unsigned, tampered, or replayed) and delivery
     failures are 5xx, so Neon retries rather than silently dropping a code.
     """
+    client_host = request.client.host if request.client else "unknown"
+    enforce(
+        bucket="webhooks.neon",
+        subject=client_host,
+        limit=60,
+        window_seconds=60,
+    )
     raw_body = await request.body()
     try:
         payload = verifier.verify(raw_body, request.headers)

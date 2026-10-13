@@ -14,6 +14,7 @@ from ..db import get_session
 from ..models import Membership, Role, UserProfile, neon_auth_user
 from ..schemas import MemberCreate, MemberOut, MemberUpdate
 from ..services.audit import write_audit
+from ..services.rate_limit import enforce
 
 router = APIRouter(
     prefix="/organizations/{organization_id}/members", tags=["members"]
@@ -86,6 +87,12 @@ def add_member(
     ctx: TenantContext = Depends(require("member:invite")),
     session: Session = Depends(get_session),
 ) -> MemberOut:
+    enforce(
+        bucket="members.add",
+        subject=str(ctx.principal.user_id),
+        limit=30,
+        window_seconds=60,
+    )
     _require_same_org(ctx, organization_id)
     _assert_role_exists(session, body.role_slug)
 
@@ -149,6 +156,12 @@ def update_member_role(
     ctx: TenantContext = Depends(require("member:role_manage")),
     session: Session = Depends(get_session),
 ) -> MemberOut:
+    enforce(
+        bucket="members.update",
+        subject=str(ctx.principal.user_id),
+        limit=30,
+        window_seconds=60,
+    )
     _require_same_org(ctx, organization_id)
     _assert_role_exists(session, body.role_slug)
 
@@ -210,6 +223,12 @@ def remove_member(
     ctx: TenantContext = Depends(require("member:remove")),
     session: Session = Depends(get_session),
 ) -> None:
+    enforce(
+        bucket="members.remove",
+        subject=str(ctx.principal.user_id),
+        limit=30,
+        window_seconds=60,
+    )
     _require_same_org(ctx, organization_id)
 
     membership = session.execute(

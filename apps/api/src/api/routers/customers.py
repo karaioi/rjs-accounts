@@ -14,6 +14,7 @@ from ..db import get_session
 from ..models import Customer
 from ..schemas import CustomerCreate, CustomerOut
 from ..services.audit import write_audit
+from ..services.rate_limit import enforce
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -59,6 +60,12 @@ def create_customer(
     session: Session = Depends(get_session),
 ) -> Customer:
     """Create and activate a customer. Platform admin only."""
+    enforce(
+        bucket="customers.create",
+        subject=str(principal.user_id),
+        limit=30,
+        window_seconds=60,
+    )
     now = datetime.now(UTC)
     customer = Customer(
         name=body.name,

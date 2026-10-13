@@ -76,3 +76,13 @@ export interface MeResponse {
   must_change_password: boolean;
   memberships: Membership[];
 }
+
+/** `POST /api/v1/auth/status` */
+export interface AccountStatusResponse {
+  email: string;
+  status: "pending" | "active" | "suspended" | "rejected" | "not_found";
+  name: string | null;
+  email_verified: boolean;
+  created_at: string | null;
+  approved_at: string | null;
+}

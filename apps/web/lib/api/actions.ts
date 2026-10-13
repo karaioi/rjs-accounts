@@ -1,7 +1,10 @@
 "use server";
 
+import { headers } from "next/headers";
 import { apiFetch } from "@/lib/api/server";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
+import { consume } from "@/lib/rate-limit";
+import type { AccountStatusResponse } from "./types";
 
 /**
  * Named Server Actions for the FastAPI calls the browser makes.
@@ -15,8 +18,29 @@ import { TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
+const CALLER_UNKNOWN_IP = "unknown";
+
+async function callerIp(): Promise<string> {
+  const requestHeaders = await headers();
+  const forwarded = requestHeaders.get("x-forwarded-for");
+  return (
+    forwarded?.split(",")[0]?.trim() ||
+    requestHeaders.get("x-real-ip") ||
+    CALLER_UNKNOWN_IP
+  );
+}
+
 /** Hand a freshly verified account to the approval workflow. */
 export async function registerAccount(): Promise<ActionResult> {
+  const ip = await callerIp();
+  const limit = consume(`action:registerAccount:${ip}`, {
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
   const response = await apiFetch("/api/v1/auth/register", { method: "POST" });
 
   if (response.status === 429) {
@@ -49,11 +73,23 @@ export async function decideUser(input: {
     return { ok: false, message: "That action is not supported." };
   }
 
+  const ip = await callerIp();
+  const limit = consume(`action:decideUser:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
   const response = await apiFetch(
     `/api/v1/users/${input.userId}/${input.decision}`,
     { method: "POST" },
   );
 
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
   if (!response.ok) {
     return {
       ok: false,
@@ -75,10 +111,22 @@ export async function deleteUser(input: {
     return { ok: false, message: "That account could not be found." };
   }
 
+  const ip = await callerIp();
+  const limit = consume(`action:deleteUser:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
   const response = await apiFetch(`/api/v1/users/${input.userId}`, {
     method: "DELETE",
   });
 
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
   if (!response.ok) {
     return {
       ok: false,
@@ -97,6 +145,15 @@ export async function deleteOrganization(input: {
     return { ok: false, message: "That organization could not be found." };
   }
 
+  const ip = await callerIp();
+  const limit = consume(`action:deleteOrg:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
   const response = await apiFetch(
     `/api/v1/organizations/${input.organizationId}`,
     {
@@ -104,6 +161,9 @@ export async function deleteOrganization(input: {
     },
   );
 
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
   if (!response.ok) {
     return {
       ok: false,
@@ -122,6 +182,15 @@ export async function approveOrganization(input: {
     return { ok: false, message: "That organization could not be found." };
   }
 
+  const ip = await callerIp();
+  const limit = consume(`action:approveOrg:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
   const response = await apiFetch(
     `/api/v1/organizations/${input.organizationId}/approve`,
     {
@@ -129,6 +198,9 @@ export async function approveOrganization(input: {
     },
   );
 
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
   if (!response.ok) {
     return {
       ok: false,
@@ -156,6 +228,15 @@ export async function createCustomer(input: {
   openingBalanceType?: "credit" | "debit";
   placeOfSupply?: string;
 }): Promise<ActionResult> {
+  const ip = await callerIp();
+  const limit = consume(`action:createCustomer:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
   const response = await apiFetch("/api/v1/customers", {
     method: "POST",
     body: JSON.stringify({
@@ -193,4 +274,54 @@ export async function createCustomer(input: {
   }
 
   return { ok: true };
+}
+
+export type CheckStatusResult =
+  | { ok: true; data: AccountStatusResponse }
+  | { ok: false; message: string };
+
+/** Check an account's approval / active status by email. */
+export async function checkAccountStatus(
+  email: string,
+): Promise<CheckStatusResult> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail?.includes("@")) {
+    return { ok: false, message: "Please enter a valid email address." };
+  }
+
+  const ip = await callerIp();
+  const ipLimit = consume(`action:checkStatus:ip:${ip}`, {
+    limit: 15,
+    windowMs: 60_000,
+  });
+  if (!ipLimit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
+  const emailLimit = consume(`action:checkStatus:email:${cleanEmail}`, {
+    limit: 5,
+    windowMs: 60_000,
+  });
+  if (!emailLimit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
+  const response = await apiFetch("/api/v1/auth/status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: cleanEmail }),
+  });
+
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: "Could not retrieve account status. Please try again later.",
+    };
+  }
+
+  const data: AccountStatusResponse = await response.json();
+  return { ok: true, data };
 }

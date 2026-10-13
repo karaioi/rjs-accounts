@@ -15,6 +15,7 @@ from ..db import get_session
 from ..models import Customer, Membership, Organization
 from ..schemas import OrganizationCreate, OrganizationOut
 from ..services.audit import write_audit
+from ..services.rate_limit import enforce
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -102,6 +103,12 @@ def create_organization(
     Platform admins create active organizations directly. A customer's
     owner/admin creates a `pending` organization that a platform admin approves.
     """
+    enforce(
+        bucket="organizations.create",
+        subject=str(principal.user_id),
+        limit=20,
+        window_seconds=60,
+    )
     if session.get(Customer, body.customer_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
@@ -187,6 +194,12 @@ def approve_organization(
     session: Session = Depends(get_session),
 ) -> OrganizationOut:
     """Activate a pending organization. Platform admin only."""
+    enforce(
+        bucket="organizations.approve",
+        subject=str(principal.user_id),
+        limit=20,
+        window_seconds=60,
+    )
     organization = session.execute(
         select(Organization)
         .where(Organization.id == organization_id)
@@ -242,6 +255,12 @@ def delete_organization(
     session: Session = Depends(get_session),
 ) -> None:
     """Permanently delete an organization and remove from both app and neon_auth schemas."""
+    enforce(
+        bucket="organizations.delete",
+        subject=str(principal.user_id),
+        limit=20,
+        window_seconds=60,
+    )
     organization = session.get(Organization, organization_id)
     if organization is None:
         # Check if it exists only in neon_auth.organization

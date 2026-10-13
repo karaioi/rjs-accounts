@@ -38,6 +38,19 @@ class AccountOut(BaseModel):
     email_verified: bool
 
 
+class AccountStatusIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+
+
+class AccountStatusOut(BaseModel):
+    email: str
+    status: str
+    name: str | None = None
+    email_verified: bool = False
+    created_at: datetime | None = None
+    approved_at: datetime | None = None
+
+
 class UserOut(BaseModel):
     """A user as seen by a platform admin in the approval queue."""
 

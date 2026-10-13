@@ -19,6 +19,7 @@ from ..db import get_session
 from ..models import UserProfile, neon_auth_user
 from ..schemas import UserOut
 from ..services.audit import write_audit
+from ..services.rate_limit import enforce
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -89,6 +90,12 @@ def approve_user(
     session: Session = Depends(get_session),
 ) -> UserOut:
     """Activate an account so its owner may read data."""
+    enforce(
+        bucket="users.approve",
+        subject=str(principal.user_id),
+        limit=30,
+        window_seconds=60,
+    )
     profile, email, name, verified = _load(session, user_id)
     if profile.status == "active":
         raise HTTPException(
@@ -130,6 +137,12 @@ def reject_user(
     `(status = 'active') = (approved_at is not null)`; the deciding admin is
     recorded in the audit log.
     """
+    enforce(
+        bucket="users.reject",
+        subject=str(principal.user_id),
+        limit=30,
+        window_seconds=60,
+    )
     profile, email, name, verified = _load(session, user_id)
     if profile.status == "rejected":
         raise HTTPException(
