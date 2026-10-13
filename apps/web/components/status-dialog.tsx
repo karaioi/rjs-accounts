@@ -83,6 +83,12 @@ export function StatusDialog({ open, onClose, result }: StatusDialogProps) {
             </span>
           </div>
 
+          {result.name && (
+            <p className="mt-1 font-medium text-sm text-foreground">
+              Organization: <span className="font-semibold">{result.name}</span>
+            </p>
+          )}
+
           <DialogDescription className="mt-3 text-sm text-muted-foreground">
             {config.description}
           </DialogDescription>

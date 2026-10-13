@@ -16,6 +16,11 @@ export const signUpSchema = z.object({
     .trim()
     .min(1, "Enter your name.")
     .max(120, "Name must be at most 120 characters."),
+  organizationName: z
+    .string()
+    .trim()
+    .min(2, "Enter your organization or company name.")
+    .max(120, "Organization name must be at most 120 characters."),
   email: z.email("Enter a valid email address."),
   password: passwordSchema,
   termsAccepted: z

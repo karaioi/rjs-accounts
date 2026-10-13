@@ -15,15 +15,25 @@ export interface CustomersProps {
   page: number;
   totalPages: number;
   search: string;
+  isAdmin?: boolean;
+  organizations?: { id: string; name: string; slug: string }[];
+  selectedOrgId?: string;
 }
 
 export interface AddCustomerFormProps {
   onDone: () => void;
   onError: (message: string) => void;
+  isAdmin?: boolean;
+  organizations?: { id: string; name: string; slug: string }[];
+  initialData?: Customer | null;
 }
 
 export interface CustomersPageProps {
-  searchParams: Promise<{ page?: string; search?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    organization_id?: string;
+  }>;
 }
 
 export const CUSTOMER_DATE_FORMATTER = new Intl.DateTimeFormat("en-IN", {

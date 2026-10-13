@@ -30,8 +30,10 @@ async function callerIp(): Promise<string> {
   );
 }
 
-/** Hand a freshly verified account to the approval workflow. */
-export async function registerAccount(): Promise<ActionResult> {
+/** Register freshly verified user as active and provision their organization. */
+export async function registerAccount(input?: {
+  organizationName?: string;
+}): Promise<ActionResult> {
   const ip = await callerIp();
   const limit = consume(`action:registerAccount:${ip}`, {
     limit: 10,
@@ -41,7 +43,13 @@ export async function registerAccount(): Promise<ActionResult> {
     return { ok: false, message: TOO_MANY_ATTEMPTS };
   }
 
-  const response = await apiFetch("/api/v1/auth/register", { method: "POST" });
+  const response = await apiFetch("/api/v1/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      organization_name: input?.organizationName || null,
+    }),
+  });
 
   if (response.status === 429) {
     return { ok: false, message: TOO_MANY_ATTEMPTS };
@@ -50,7 +58,7 @@ export async function registerAccount(): Promise<ActionResult> {
     return {
       ok: false,
       message:
-        "Your email is verified, but we could not finish registration. Please contact support.",
+        "Your email is verified, but we could not finish organization registration. Please contact support.",
     };
   }
 
@@ -211,6 +219,43 @@ export async function approveOrganization(input: {
   return { ok: true };
 }
 
+/** Cancel / suspend an organization (platform admins only). */
+export async function cancelOrganization(input: {
+  organizationId: string;
+}): Promise<ActionResult> {
+  if (!UUID.test(input.organizationId)) {
+    return { ok: false, message: "That organization could not be found." };
+  }
+
+  const ip = await callerIp();
+  const limit = consume(`action:cancelOrg:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
+  const response = await apiFetch(
+    `/api/v1/organizations/${input.organizationId}/cancel`,
+    {
+      method: "POST",
+    },
+  );
+
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      message: "Could not cancel that organization. Please try again.",
+    };
+  }
+
+  return { ok: true };
+}
+
 /** Create a customer (platform admins only). */
 export async function createCustomer(input: {
   name: string;
@@ -227,6 +272,7 @@ export async function createCustomer(input: {
   openingBalance?: string;
   openingBalanceType?: "credit" | "debit";
   placeOfSupply?: string;
+  organizationId?: string;
 }): Promise<ActionResult> {
   const ip = await callerIp();
   const limit = consume(`action:createCustomer:${ip}`, {
@@ -254,6 +300,7 @@ export async function createCustomer(input: {
       opening_balance: input.openingBalance || null,
       opening_balance_type: input.openingBalanceType || null,
       place_of_supply: input.placeOfSupply || null,
+      organization_id: input.organizationId || null,
     }),
   });
 
@@ -262,6 +309,118 @@ export async function createCustomer(input: {
   }
   if (!response.ok) {
     let message = "Could not create that customer. Please try again.";
+    try {
+      const data = await response.json();
+      if (data?.detail) {
+        message = typeof data.detail === "string" ? data.detail : message;
+      }
+    } catch {
+      // Response body wasn't JSON — keep the default message.
+    }
+    return { ok: false, message };
+  }
+
+  return { ok: true };
+}
+
+/** Update a customer. */
+export async function updateCustomer(input: {
+  customerId: string;
+  name: string;
+  gstin?: string;
+  companyName?: string;
+  location?: string;
+  address1?: string;
+  address2?: string;
+  pincode?: string;
+  state?: string;
+  email?: string;
+  contactMobile?: string;
+  contactTelephone?: string;
+  openingBalance?: string;
+  openingBalanceType?: "credit" | "debit";
+  placeOfSupply?: string;
+  organizationId?: string;
+}): Promise<ActionResult> {
+  if (!UUID.test(input.customerId)) {
+    return { ok: false, message: "That customer could not be found." };
+  }
+
+  const ip = await callerIp();
+  const limit = consume(`action:updateCustomer:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
+  const response = await apiFetch(`/api/v1/customers/${input.customerId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      name: input.name,
+      gstin: input.gstin || null,
+      company_name: input.companyName || null,
+      location: input.location || null,
+      address1: input.address1 || null,
+      address2: input.address2 || null,
+      pincode: input.pincode || null,
+      state: input.state || null,
+      email: input.email || null,
+      contact_mobile: input.contactMobile || null,
+      contact_telephone: input.contactTelephone || null,
+      opening_balance: input.openingBalance || null,
+      opening_balance_type: input.openingBalanceType || null,
+      place_of_supply: input.placeOfSupply || null,
+      organization_id: input.organizationId || null,
+    }),
+  });
+
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+  if (!response.ok) {
+    let message = "Could not update that customer. Please try again.";
+    try {
+      const data = await response.json();
+      if (data?.detail) {
+        message = typeof data.detail === "string" ? data.detail : message;
+      }
+    } catch {
+      // Response body wasn't JSON — keep the default message.
+    }
+    return { ok: false, message };
+  }
+
+  return { ok: true };
+}
+
+/** Delete a customer. */
+export async function deleteCustomer(input: {
+  customerId: string;
+}): Promise<ActionResult> {
+  if (!UUID.test(input.customerId)) {
+    return { ok: false, message: "That customer could not be found." };
+  }
+
+  const ip = await callerIp();
+  const limit = consume(`action:deleteCustomer:${ip}`, {
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
+  const response = await apiFetch(`/api/v1/customers/${input.customerId}`, {
+    method: "DELETE",
+  });
+
+  if (response.status === 429) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+  if (!response.ok) {
+    let message = "Could not delete that customer. Please try again.";
     try {
       const data = await response.json();
       if (data?.detail) {

@@ -6,6 +6,7 @@ import * as z from "zod";
  * Two variants: GST-registered (includes GSTIN) and GST-unregistered (no GSTIN).
  */
 const baseFields = {
+  organizationId: z.string(),
   companyName: z.string().trim().min(1, "Company name is required."),
   location: z.string().trim().min(1, "Location is required."),
   address1: z.string().trim().min(1, "Address is required."),

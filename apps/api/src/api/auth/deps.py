@@ -105,7 +105,23 @@ def get_principal(
 
     is_platform_admin = row["role"] == "admin"
     profile = session.get(UserProfile, user_id)
-    account_status = profile.status if profile is not None else "pending"
+
+    if is_platform_admin:
+        account_status = "active"
+    else:
+        org = session.execute(
+            select(Organization)
+            .join(Membership, Membership.organization_id == Organization.id)
+            .where(
+                Membership.user_id == user_id,
+                Membership.status == "active",
+            )
+            .order_by(Organization.created_at.desc())
+        ).scalars().first()
+        if org is not None:
+            account_status = org.status
+        else:
+            account_status = profile.status if profile is not None else "pending"
 
     set_rls_context(
         session, user_id=user_id, is_platform_admin=is_platform_admin

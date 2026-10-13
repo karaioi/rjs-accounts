@@ -33,9 +33,9 @@ export interface StatusConfig {
 export const STATUS_CONFIG: Record<PendingStatus, StatusConfig> = {
   pending: {
     tone: "warning",
-    title: "Awaiting administrator approval",
+    title: "Organization awaiting approval",
     description:
-      "Your account has been registered and verified. An administrator has not granted access yet. You will be able to sign in once approved.",
+      "Your organization workspace has been registered. An administrator has not approved it yet. You will be able to access your workspace once approved.",
   },
   active: {
     tone: "success",

@@ -5,6 +5,8 @@ export interface Customer {
   id: string;
   name: string;
   status: string;
+  organization_id: string | null;
+  organization_name: string | null;
   gstin: string | null;
   company_name: string | null;
   location: string | null;

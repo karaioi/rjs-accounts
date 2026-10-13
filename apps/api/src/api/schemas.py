@@ -30,12 +30,18 @@ class MeOut(BaseModel):
     memberships: list[MembershipOut]
 
 
+class RegisterIn(BaseModel):
+    organization_name: str | None = None
+
+
 class AccountOut(BaseModel):
     """The caller's own account state (returned by `/auth/register`)."""
 
     user_id: uuid.UUID
     account_status: str
     email_verified: bool
+    organization_id: uuid.UUID | None = None
+    organization_name: str | None = None
 
 
 class AccountStatusIn(BaseModel):
@@ -87,6 +93,8 @@ class CustomerOut(BaseModel):
     name: str
     slug: str
     status: str
+    organization_id: uuid.UUID | None = None
+    organization_name: str | None = None
     gstin: str | None = None
     company_name: str | None = None
     location: str | None = None
@@ -106,7 +114,8 @@ class CustomerOut(BaseModel):
 
 class CustomerCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    slug: str = Field(min_length=1, max_length=60, pattern=r"^[a-z0-9-]+$")
+    slug: str | None = Field(default=None, max_length=60)
+    organization_id: uuid.UUID | None = None
     gstin: str | None = None
     company_name: str | None = None
     location: str | None = None
@@ -120,6 +129,24 @@ class CustomerCreate(BaseModel):
     opening_balance: str | None = None
     opening_balance_type: str | None = None
     place_of_supply: str | None = None
+
+
+class CustomerUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    company_name: str | None = None
+    gstin: str | None = None
+    location: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    pincode: str | None = None
+    state: str | None = None
+    email: str | None = None
+    contact_mobile: str | None = None
+    contact_telephone: str | None = None
+    opening_balance: str | None = None
+    opening_balance_type: str | None = None
+    place_of_supply: str | None = None
+    organization_id: uuid.UUID | None = None
 
 
 class OrganizationOut(BaseModel):

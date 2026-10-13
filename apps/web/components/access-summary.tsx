@@ -15,19 +15,23 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { FormMessage } from "@/components/auth-message";
-import { approveOrganization, deleteOrganization } from "@/lib/api/actions";
+import {
+  approveOrganization,
+  cancelOrganization,
+  deleteOrganization,
+} from "@/lib/api/actions";
 import type { OrganizationItem } from "@/lib/api/types";
 import { ADMIN_DATE_FORMATTER } from "@/lib/data/admin";
 import {
   BADGE_TONE_CLASSES,
   accountStatus,
-  orgRole,
   platformRole,
   type AccessSummaryProps,
 } from "@/lib/data/roles";
 import {
   BadgeCheckIcon,
   Building03Icon,
+  Cancel01Icon,
   CheckmarkCircle02Icon,
   Clock01Icon,
   Shield01Icon,
@@ -36,11 +40,18 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+type OrgConfirmAction = "approve" | "cancel" | "delete";
+
+interface PendingActionState {
+  org: OrganizationItem;
+  type: OrgConfirmAction;
+}
+
 /**
  * Everything the API returned about the signed-in caller: identity, platform
  * role, account status, and their organization roles.
  * For platform admins, displays all organizations across any status with
- * complete management (approve pending, permanently delete from app and Neon Auth).
+ * complete management (approve pending, cancel/suspend, permanently delete from app and Neon Auth).
  */
 export function AccessSummary({ me, organizations }: AccessSummaryProps) {
   const router = useRouter();
@@ -52,53 +63,69 @@ export function AccessSummary({ me, organizations }: AccessSummaryProps) {
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingDeleteOrg, setPendingDeleteOrg] =
-    useState<OrganizationItem | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingActionState | null>(
+    null,
+  );
 
-  async function handleApprove(org: OrganizationItem) {
+  async function handleConfirmAction() {
+    if (!pendingAction) return;
+    const { org, type } = pendingAction;
     setError(null);
     setBusyId(org.id);
+
     try {
-      const res = await approveOrganization({ organizationId: org.id });
-      if (!res.ok) {
-        setError(res.message);
-        return;
+      if (type === "approve") {
+        const res = await approveOrganization({ organizationId: org.id });
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+        setOrgList((current) =>
+          current.map((item) =>
+            item.id === org.id
+              ? {
+                  ...item,
+                  status: "active",
+                  approved_at: new Date().toISOString(),
+                }
+              : item,
+          ),
+        );
+      } else if (type === "cancel") {
+        const res = await cancelOrganization({ organizationId: org.id });
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+        setOrgList((current) =>
+          current.map((item) =>
+            item.id === org.id
+              ? {
+                  ...item,
+                  status: "suspended",
+                }
+              : item,
+          ),
+        );
+      } else if (type === "delete") {
+        const res = await deleteOrganization({ organizationId: org.id });
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+        setOrgList((current) => current.filter((item) => item.id !== org.id));
       }
-      setOrgList((current) =>
-        current.map((item) =>
-          item.id === org.id
-            ? {
-                ...item,
-                status: "active",
-                approved_at: new Date().toISOString(),
-              }
-            : item,
-        ),
+
+      setPendingAction(null);
+      router.refresh();
+    } catch {
+      setError(
+        type === "approve"
+          ? "Could not approve that organization. Please try again."
+          : type === "cancel"
+            ? "Could not cancel that organization. Please try again."
+            : "Could not delete that organization. Please try again.",
       );
-      router.refresh();
-    } catch {
-      setError("Could not approve that organization. Please try again.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleDeleteConfirm() {
-    if (!pendingDeleteOrg) return;
-    const org = pendingDeleteOrg;
-    setError(null);
-    setBusyId(org.id);
-    try {
-      const res = await deleteOrganization({ organizationId: org.id });
-      if (!res.ok) {
-        setError(res.message);
-        return;
-      }
-      setOrgList((current) => current.filter((item) => item.id !== org.id));
-      setPendingDeleteOrg(null);
-      router.refresh();
-    } catch {
-      setError("Could not delete that organization. Please try again.");
     } finally {
       setBusyId(null);
     }
@@ -191,8 +218,8 @@ export function AccessSummary({ me, organizations }: AccessSummaryProps) {
 
           {error && <FormMessage tone="error">{error}</FormMessage>}
 
-          {/* Organizations section */}
-          {me.is_platform_admin ? (
+          {/* Organizations section - platform admin only */}
+          {me.is_platform_admin && (
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h2 className="flex items-center gap-1.5 text-sm font-semibold">
@@ -267,7 +294,9 @@ export function AccessSummary({ me, organizations }: AccessSummaryProps) {
                               className="rounded-xl shadow-sm shadow-brand-green/20"
                               size="sm"
                               disabled={busy}
-                              onClick={() => handleApprove(org)}
+                              onClick={() =>
+                                setPendingAction({ org, type: "approve" })
+                              }
                             >
                               <HugeiconsIcon
                                 icon={CheckmarkCircle02Icon}
@@ -278,13 +307,56 @@ export function AccessSummary({ me, organizations }: AccessSummaryProps) {
                             </Button>
                           )}
 
+                          {org.status === "suspended" && (
+                            <Button
+                              type="button"
+                              className="rounded-xl shadow-sm shadow-brand-green/20"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                setPendingAction({ org, type: "approve" })
+                              }
+                            >
+                              <HugeiconsIcon
+                                icon={CheckmarkCircle02Icon}
+                                size={14}
+                                strokeWidth={1.5}
+                              />
+                              Reactivate
+                            </Button>
+                          )}
+
+                          {(org.status === "pending" ||
+                            org.status === "active") && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="rounded-xl border-amber-500/30 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                setPendingAction({ org, type: "cancel" })
+                              }
+                              title="Cancel or suspend organization"
+                            >
+                              <HugeiconsIcon
+                                icon={Cancel01Icon}
+                                size={14}
+                                strokeWidth={1.5}
+                              />
+                              Cancel
+                            </Button>
+                          )}
+
                           <Button
                             type="button"
                             variant="outline"
                             className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                             size="sm"
                             disabled={busy}
-                            onClick={() => setPendingDeleteOrg(org)}
+                            onClick={() =>
+                              setPendingAction({ org, type: "delete" })
+                            }
                             title="Permanently delete from app and Neon Auth"
                           >
                             <HugeiconsIcon
@@ -301,124 +373,93 @@ export function AccessSummary({ me, organizations }: AccessSummaryProps) {
                 </ul>
               )}
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-                <HugeiconsIcon
-                  icon={Building03Icon}
-                  size={16}
-                  strokeWidth={1.5}
-                />
-                Organizations
-                <span className="font-normal text-muted-foreground">
-                  ({me.memberships.length})
-                </span>
-              </h2>
-
-              {me.memberships.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-black/10 px-6 py-8 text-center">
-                  <HugeiconsIcon
-                    icon={UserSearch01Icon}
-                    size={24}
-                    strokeWidth={1.5}
-                    className="text-muted-foreground"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    You don&apos;t belong to an organization yet. An owner or
-                    admin adds members by email.
-                  </p>
-                </div>
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {me.memberships.map((membership) => {
-                    const role = orgRole(membership.role_slug);
-                    const membershipStatus = accountStatus(membership.status);
-
-                    return (
-                      <li
-                        key={membership.organization_id}
-                        className="flex flex-col gap-3 rounded-2xl border border-black/10 bg-white/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">
-                            {membership.organization_name}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {role.description}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={BADGE_TONE_CLASSES.neutral}
-                          >
-                            <span className="font-mono">{role.slug}</span>
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={
-                              BADGE_TONE_CLASSES[membershipStatus.tone]
-                            }
-                          >
-                            {membershipStatus.label}
-                          </Badge>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Confirmation dialog for deleting an organization */}
+      {/* Confirmation dialog for organization actions */}
       <Dialog
-        open={!!pendingDeleteOrg}
+        open={!!pendingAction}
         onOpenChange={(open) => {
           if (!open && !busyId) {
-            setPendingDeleteOrg(null);
+            setPendingAction(null);
           }
         }}
       >
         <DialogContent className="rounded-3xl">
           <DialogHeader>
-            <DialogTitle>Delete organization</DialogTitle>
+            <DialogTitle>
+              {pendingAction?.type === "approve"
+                ? "Approve organization"
+                : pendingAction?.type === "cancel"
+                  ? "Cancel organization"
+                  : "Delete organization"}
+            </DialogTitle>
             <DialogDescription>
-              This will permanently delete this organization and remove it from
-              everywhere, including Neon Auth and workspace memberships. This
-              action cannot be undone.
+              {pendingAction?.type === "approve"
+                ? "This will activate the organization and allow its members to sign in and access workspace features."
+                : pendingAction?.type === "cancel"
+                  ? "This will cancel and suspend the organization. Its members will immediately lose access until re-approved."
+                  : "This will permanently delete this organization and remove it from everywhere, including Neon Auth and workspace memberships. This action cannot be undone."}
             </DialogDescription>
           </DialogHeader>
-          {pendingDeleteOrg && (
+
+          {pendingAction && (
             <div className="flex flex-col gap-2 rounded-2xl border border-black/5 bg-black/5 p-4 text-sm">
-              <p className="font-medium text-slate-900">
-                {pendingDeleteOrg.name}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-medium text-slate-900">
+                  {pendingAction.org.name}
+                </p>
+                <Badge
+                  variant="outline"
+                  className={
+                    BADGE_TONE_CLASSES[
+                      accountStatus(pendingAction.org.status).tone
+                    ]
+                  }
+                >
+                  {accountStatus(pendingAction.org.status).label}
+                </Badge>
+              </div>
               <p className="font-mono text-xs text-muted-foreground">
-                Slug: {pendingDeleteOrg.slug} · Status:{" "}
-                {pendingDeleteOrg.status}
+                Slug: {pendingAction.org.slug} · ID: {pendingAction.org.id}
               </p>
             </div>
           )}
-          <DialogFooter>
+
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
               className="rounded-3xl"
               disabled={!!busyId}
-              onClick={() => setPendingDeleteOrg(null)}
+              onClick={() => setPendingAction(null)}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              className="rounded-3xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={
+                pendingAction?.type === "approve"
+                  ? "rounded-3xl bg-brand-green text-white hover:bg-brand-green/90 shadow-md shadow-brand-green/20"
+                  : pendingAction?.type === "cancel"
+                    ? "rounded-3xl bg-amber-600 text-white hover:bg-amber-700 shadow-md shadow-amber-600/20"
+                    : "rounded-3xl bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md shadow-destructive/20"
+              }
               disabled={!!busyId}
-              onClick={handleDeleteConfirm}
+              onClick={handleConfirmAction}
             >
-              {busyId ? "Deleting..." : "Delete permanently"}
+              {busyId
+                ? pendingAction?.type === "approve"
+                  ? "Approving..."
+                  : pendingAction?.type === "cancel"
+                    ? "Canceling..."
+                    : "Deleting..."
+                : pendingAction?.type === "approve"
+                  ? "Approve organization"
+                  : pendingAction?.type === "cancel"
+                    ? "Cancel organization"
+                    : "Delete permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>

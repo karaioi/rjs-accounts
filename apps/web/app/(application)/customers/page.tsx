@@ -11,6 +11,7 @@ export default async function CustomersPage({
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const search = params.search ?? "";
+  const organizationId = params.organization_id ?? "";
 
   const meResponse = await apiFetch("/api/v1/me");
   if (!meResponse.ok) {
@@ -18,13 +19,24 @@ export default async function CustomersPage({
   }
 
   const me = await meResponse.json();
-  if (!me.is_platform_admin) {
-    redirect("/dashboard");
+  if (!me.is_platform_admin && me.account_status !== "active") {
+    redirect("/pending");
+  }
+
+  let organizations: { id: string; name: string; slug: string }[] = [];
+  if (me.is_platform_admin) {
+    const orgsResponse = await apiFetch("/api/v1/organizations");
+    if (orgsResponse.ok) {
+      organizations = await orgsResponse.json();
+    }
   }
 
   const query = new URLSearchParams({ page: String(page) });
   if (search) {
     query.set("search", search);
+  }
+  if (organizationId && me.is_platform_admin) {
+    query.set("organization_id", organizationId);
   }
 
   const listResponse = await apiFetch(`/api/v1/customers?${query.toString()}`);
@@ -44,6 +56,9 @@ export default async function CustomersPage({
       page={data?.page ?? 1}
       totalPages={data?.total_pages ?? 1}
       search={search}
+      isAdmin={me.is_platform_admin}
+      organizations={organizations}
+      selectedOrgId={organizationId}
     />
   );
 }

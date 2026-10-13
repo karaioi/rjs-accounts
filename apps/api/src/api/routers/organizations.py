@@ -39,63 +39,47 @@ def _to_out(org: Organization, role_slug: str | None) -> OrganizationOut:
 def list_organizations(
     customer_id: uuid.UUID | None = None,
     status_filter: str | None = Query(default=None, alias="status"),
-    principal: Principal = Depends(require_verified_login),
+    principal: Principal = Depends(require_platform_admin),
     session: Session = Depends(get_session),
 ) -> list[OrganizationOut]:
-    if principal.is_platform_admin:
-        stmt = select(Organization).order_by(Organization.name)
-        if customer_id:
-            stmt = stmt.where(Organization.customer_id == customer_id)
-        if status_filter:
-            stmt = stmt.where(Organization.status == status_filter)
-        app_orgs = session.execute(stmt).scalars().all()
-        result = [_to_out(org, None) for org in app_orgs]
-
-        # Also include any neon_auth.organization entries that may not be in app.organization
-        if not customer_id:
-            existing_ids = {org.id for org in app_orgs}
-            existing_slugs = {org.slug for org in app_orgs}
-            neon_rows = session.execute(
-                text('select id, name, slug, "createdAt" from neon_auth.organization order by name')
-            ).all()
-            for row in neon_rows:
-                if row.id not in existing_ids and row.slug not in existing_slugs:
-                    if not status_filter or status_filter == "active":
-                        result.append(
-                            OrganizationOut(
-                                id=row.id,
-                                customer_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
-                                name=row.name,
-                                slug=row.slug,
-                                status="active",
-                                role_slug=None,
-                                created_at=row.createdAt,
-                                approved_at=row.createdAt,
-                            )
-                        )
-        return result
-
-    stmt = (
-        select(Organization, Membership.role_slug)
-        .join(Membership, Membership.organization_id == Organization.id)
-        .where(
-            Membership.user_id == principal.user_id,
-            Membership.status == "active",
-        )
-        .order_by(Organization.name)
-    )
+    stmt = select(Organization).order_by(Organization.name)
     if customer_id:
         stmt = stmt.where(Organization.customer_id == customer_id)
     if status_filter:
         stmt = stmt.where(Organization.status == status_filter)
-    return [_to_out(org, role) for org, role in session.execute(stmt).all()]
+    app_orgs = session.execute(stmt).scalars().all()
+    result = [_to_out(org, None) for org in app_orgs]
+
+    # Also include any neon_auth.organization entries that may not be in app.organization
+    if not customer_id:
+        existing_ids = {org.id for org in app_orgs}
+        existing_slugs = {org.slug for org in app_orgs}
+        neon_rows = session.execute(
+            text('select id, name, slug, "createdAt" from neon_auth.organization order by name')
+        ).all()
+        for row in neon_rows:
+            if row.id not in existing_ids and row.slug not in existing_slugs:
+                if not status_filter or status_filter == "active":
+                    result.append(
+                        OrganizationOut(
+                            id=row.id,
+                            customer_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+                            name=row.name,
+                            slug=row.slug,
+                            status="active",
+                            role_slug=None,
+                            created_at=row.createdAt,
+                            approved_at=row.createdAt,
+                        )
+                    )
+    return result
 
 
 @router.post("", response_model=OrganizationOut, status_code=status.HTTP_201_CREATED)
 def create_organization(
     body: OrganizationCreate,
     request: Request,
-    principal: Principal = Depends(require_verified_login),
+    principal: Principal = Depends(require_platform_admin),
     session: Session = Depends(get_session),
 ) -> OrganizationOut:
     """Create an organization.
@@ -216,6 +200,12 @@ def approve_organization(
     organization.approved_by = principal.user_id
     organization.approved_at = datetime.now(UTC)
 
+    customer = session.get(Customer, organization.customer_id)
+    if customer is not None and customer.status != "active":
+        customer.status = "active"
+        customer.approved_by = principal.user_id
+        customer.approved_at = datetime.now(UTC)
+
     # Ensure it exists and is synced in neon_auth
     now = datetime.now(UTC)
     session.execute(
@@ -240,6 +230,56 @@ def approve_organization(
         entity_id=str(organization.id),
         customer_id=organization.customer_id,
         organization_id=organization.id,
+        request=request,
+    )
+    session.commit()
+    session.refresh(organization)
+    return _to_out(organization, None)
+
+
+@router.post("/{organization_id}/cancel", response_model=OrganizationOut)
+def cancel_organization(
+    organization_id: uuid.UUID,
+    request: Request,
+    principal: Principal = Depends(require_platform_admin),
+    session: Session = Depends(get_session),
+) -> OrganizationOut:
+    """Cancel / suspend an organization. Platform admin only."""
+    enforce(
+        bucket="organizations.cancel",
+        subject=str(principal.user_id),
+        limit=20,
+        window_seconds=60,
+    )
+    organization = session.execute(
+        select(Organization)
+        .where(Organization.id == organization_id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
+    if organization.status == "suspended":
+        return _to_out(organization, None)
+
+    previous = organization.status
+    organization.status = "suspended"
+
+    customer = session.get(Customer, organization.customer_id)
+    if customer is not None:
+        customer.status = "suspended"
+
+    write_audit(
+        session,
+        actor_user_id=principal.user_id,
+        action="organization.cancel",
+        entity_type="organization",
+        entity_id=str(organization.id),
+        customer_id=organization.customer_id,
+        organization_id=organization.id,
+        before={"status": previous},
+        after={"status": "suspended"},
         request=request,
     )
     session.commit()

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormMessage } from "@/components/auth-message";
 import { Reveal } from "@/components/motion/reveal";
@@ -22,7 +21,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { approveOrganization, deleteOrganization } from "@/lib/api/actions";
+import {
+  approveOrganization,
+  cancelOrganization,
+  deleteOrganization,
+} from "@/lib/api/actions";
 import type { OrganizationItem } from "@/lib/api/types";
 import {
   ADMIN_DATE_FORMATTER,
@@ -33,13 +36,20 @@ import {
 import { BADGE_TONE_CLASSES, accountStatus } from "@/lib/data/roles";
 import {
   Building03Icon,
+  Cancel01Icon,
   CheckmarkCircle02Icon,
   RefreshIcon,
   TrashIcon,
-  UserCheck01Icon,
   UserSearch01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
+type OrgConfirmAction = "approve" | "cancel" | "delete";
+
+interface PendingActionState {
+  org: OrganizationItem;
+  type: OrgConfirmAction;
+}
 
 export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
   const router = useRouter();
@@ -48,7 +58,7 @@ export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
     useState<OrganizationStatusFilter>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<OrganizationItem | null>(
+  const [pendingAction, setPendingAction] = useState<PendingActionState | null>(
     null,
   );
 
@@ -57,54 +67,68 @@ export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
     return org.status === activeFilter;
   });
 
-  async function handleApprove(org: OrganizationItem) {
+  async function handleConfirmAction() {
+    if (!pendingAction) return;
+    const { org, type } = pendingAction;
     setError(null);
     setBusyId(org.id);
 
     try {
-      const res = await approveOrganization({ organizationId: org.id });
-      if (!res.ok) {
-        setError(res.message);
-        return;
+      if (type === "approve") {
+        const res = await approveOrganization({ organizationId: org.id });
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+
+        setList((current) =>
+          current.map((item) =>
+            item.id === org.id
+              ? {
+                  ...item,
+                  status: "active",
+                  approved_at: new Date().toISOString(),
+                }
+              : item,
+          ),
+        );
+      } else if (type === "cancel") {
+        const res = await cancelOrganization({ organizationId: org.id });
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+
+        setList((current) =>
+          current.map((item) =>
+            item.id === org.id
+              ? {
+                  ...item,
+                  status: "suspended",
+                }
+              : item,
+          ),
+        );
+      } else if (type === "delete") {
+        const res = await deleteOrganization({ organizationId: org.id });
+        if (!res.ok) {
+          setError(res.message);
+          return;
+        }
+
+        setList((current) => current.filter((item) => item.id !== org.id));
       }
 
-      setList((current) =>
-        current.map((item) =>
-          item.id === org.id
-            ? {
-                ...item,
-                status: "active",
-                approved_at: new Date().toISOString(),
-              }
-            : item,
-        ),
+      setPendingAction(null);
+      router.refresh();
+    } catch {
+      setError(
+        type === "approve"
+          ? "Could not approve that organization. Please try again."
+          : type === "cancel"
+            ? "Could not cancel that organization. Please try again."
+            : "Could not delete that organization. Please try again.",
       );
-      router.refresh();
-    } catch {
-      setError("Could not approve that organization. Please try again.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleDeleteConfirm() {
-    if (!pendingDelete) return;
-    const org = pendingDelete;
-    setError(null);
-    setBusyId(org.id);
-
-    try {
-      const res = await deleteOrganization({ organizationId: org.id });
-      if (!res.ok) {
-        setError(res.message);
-        return;
-      }
-
-      setList((current) => current.filter((item) => item.id !== org.id));
-      setPendingDelete(null);
-      router.refresh();
-    } catch {
-      setError("Could not delete that organization. Please try again.");
     } finally {
       setBusyId(null);
     }
@@ -112,28 +136,6 @@ export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-8">
-      {/* Admin Nav Tabs */}
-      <div className="flex items-center gap-2 border-b border-black/10 pb-3">
-        <Link href="/admin/users">
-          <Button
-            variant="ghost"
-            className="rounded-xl text-muted-foreground hover:text-foreground"
-          >
-            <HugeiconsIcon icon={UserCheck01Icon} size={16} strokeWidth={1.5} />
-            Users
-          </Button>
-        </Link>
-        <Link href="/admin/organizations">
-          <Button
-            variant="default"
-            className="rounded-xl bg-brand-blue text-white hover:bg-brand-blue/90"
-          >
-            <HugeiconsIcon icon={Building03Icon} size={16} strokeWidth={1.5} />
-            Organizations
-          </Button>
-        </Link>
-      </div>
-
       <Reveal variant="fade-up">
         <Card className="rounded-3xl border-black/10 bg-[#fffafa]/70">
           <CardHeader>
@@ -248,7 +250,9 @@ export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
                             className="rounded-xl shadow-lg shadow-brand-green/25"
                             size="sm"
                             disabled={busy}
-                            onClick={() => handleApprove(org)}
+                            onClick={() =>
+                              setPendingAction({ org, type: "approve" })
+                            }
                           >
                             <HugeiconsIcon
                               icon={CheckmarkCircle02Icon}
@@ -259,13 +263,56 @@ export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
                           </Button>
                         )}
 
+                        {org.status === "suspended" && (
+                          <Button
+                            type="button"
+                            className="rounded-xl shadow-lg shadow-brand-green/25"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              setPendingAction({ org, type: "approve" })
+                            }
+                          >
+                            <HugeiconsIcon
+                              icon={CheckmarkCircle02Icon}
+                              size={14}
+                              strokeWidth={1.5}
+                            />
+                            Reactivate
+                          </Button>
+                        )}
+
+                        {(org.status === "pending" ||
+                          org.status === "active") && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-xl border-amber-500/30 text-amber-700 hover:bg-amber-500/10 hover:text-amber-800"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              setPendingAction({ org, type: "cancel" })
+                            }
+                            title="Cancel or suspend organization"
+                          >
+                            <HugeiconsIcon
+                              icon={Cancel01Icon}
+                              size={14}
+                              strokeWidth={1.5}
+                            />
+                            Cancel
+                          </Button>
+                        )}
+
                         <Button
                           type="button"
                           variant="outline"
                           className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                           size="sm"
                           disabled={busy}
-                          onClick={() => setPendingDelete(org)}
+                          onClick={() =>
+                            setPendingAction({ org, type: "delete" })
+                          }
                           title="Permanently delete from app and Neon Auth"
                         >
                           <HugeiconsIcon
@@ -287,49 +334,87 @@ export function AdminOrganizations({ organizations }: AdminOrganizationsProps) {
 
       {/* Confirmation Dialog */}
       <Dialog
-        open={!!pendingDelete}
+        open={!!pendingAction}
         onOpenChange={(open) => {
           if (!open && !busyId) {
-            setPendingDelete(null);
+            setPendingAction(null);
           }
         }}
       >
         <DialogContent className="rounded-3xl">
           <DialogHeader>
-            <DialogTitle>Delete organization</DialogTitle>
+            <DialogTitle>
+              {pendingAction?.type === "approve"
+                ? "Approve organization"
+                : pendingAction?.type === "cancel"
+                  ? "Cancel organization"
+                  : "Delete organization"}
+            </DialogTitle>
             <DialogDescription>
-              This will permanently delete this organization and remove it from
-              everywhere, including Neon Auth and all workspace memberships.
-              This action cannot be undone.
+              {pendingAction?.type === "approve"
+                ? "This will activate the organization and allow its members to sign in and access workspace features."
+                : pendingAction?.type === "cancel"
+                  ? "This will cancel and suspend the organization. Its members will immediately lose access until re-approved."
+                  : "This will permanently delete this organization and remove it from everywhere, including Neon Auth and all workspace memberships. This action cannot be undone."}
             </DialogDescription>
           </DialogHeader>
 
-          {pendingDelete && (
+          {pendingAction && (
             <div className="flex flex-col gap-2 rounded-2xl border border-black/5 bg-black/5 p-4 text-sm">
-              <p className="font-medium text-slate-900">{pendingDelete.name}</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="truncate font-medium text-slate-900">
+                  {pendingAction.org.name}
+                </p>
+                <Badge
+                  variant="outline"
+                  className={
+                    BADGE_TONE_CLASSES[
+                      accountStatus(pendingAction.org.status).tone
+                    ]
+                  }
+                >
+                  {accountStatus(pendingAction.org.status).label}
+                </Badge>
+              </div>
               <p className="font-mono text-xs text-muted-foreground">
-                Slug: {pendingDelete.slug} · Status: {pendingDelete.status}
+                Slug: {pendingAction.org.slug} · ID: {pendingAction.org.id}
               </p>
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
               variant="outline"
               className="rounded-3xl"
               disabled={!!busyId}
-              onClick={() => setPendingDelete(null)}
+              onClick={() => setPendingAction(null)}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              className="rounded-3xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={
+                pendingAction?.type === "approve"
+                  ? "rounded-3xl bg-brand-green text-white hover:bg-brand-green/90 shadow-lg shadow-brand-green/25"
+                  : pendingAction?.type === "cancel"
+                    ? "rounded-3xl bg-amber-600 text-white hover:bg-amber-700 shadow-lg shadow-amber-600/25"
+                    : "rounded-3xl bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/25"
+              }
               disabled={!!busyId}
-              onClick={handleDeleteConfirm}
+              onClick={handleConfirmAction}
             >
-              {busyId ? "Deleting..." : "Delete permanently"}
+              {busyId
+                ? pendingAction?.type === "approve"
+                  ? "Approving..."
+                  : pendingAction?.type === "cancel"
+                    ? "Canceling..."
+                    : "Deleting..."
+                : pendingAction?.type === "approve"
+                  ? "Approve organization"
+                  : pendingAction?.type === "cancel"
+                    ? "Cancel organization"
+                    : "Delete permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>

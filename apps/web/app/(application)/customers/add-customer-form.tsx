@@ -19,7 +19,7 @@ import { Select } from "@/components/ui/select";
 import { SheetFooter } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { createCustomer } from "@/lib/api/actions";
+import { createCustomer, updateCustomer } from "@/lib/api/actions";
 import {
   type AddCustomerFormProps,
   CUSTOMER_FIELD_LABELS,
@@ -32,25 +32,36 @@ import {
   gstUnregisteredSchema,
 } from "@/lib/validations/customer";
 
-export function AddCustomerForm({ onDone, onError }: AddCustomerFormProps) {
+export function AddCustomerForm({
+  onDone,
+  onError,
+  isAdmin,
+  organizations,
+  initialData,
+}: AddCustomerFormProps) {
   const [pending, setPending] = useState(false);
-  const [gstTab, setGstTab] = useState<GstTab>("registered");
+  const [gstTab, setGstTab] = useState<GstTab>(
+    initialData?.gstin ? "registered" : "unregistered",
+  );
 
   const form = useForm({
     defaultValues: {
-      gstin: "",
-      companyName: "",
-      location: "",
-      address1: "",
-      address2: "",
-      pincode: "",
-      state: "",
-      email: "",
-      contactMobile: "",
-      contactTelephone: "",
-      openingBalance: "",
-      placeOfSupply: "",
-      openingBalanceType: "credit" as "credit" | "debit",
+      organizationId:
+        initialData?.organization_id ?? organizations?.[0]?.id ?? "",
+      gstin: initialData?.gstin ?? "",
+      companyName: initialData?.company_name ?? initialData?.name ?? "",
+      location: initialData?.location ?? "",
+      address1: initialData?.address1 ?? "",
+      address2: initialData?.address2 ?? "",
+      pincode: initialData?.pincode ?? "",
+      state: initialData?.state ?? "",
+      email: initialData?.email ?? "",
+      contactMobile: initialData?.contact_mobile ?? "",
+      contactTelephone: initialData?.contact_telephone ?? "",
+      openingBalance: initialData?.opening_balance ?? "",
+      placeOfSupply: initialData?.place_of_supply ?? "",
+      openingBalanceType:
+        (initialData?.opening_balance_type as "credit" | "debit") ?? "credit",
     },
     validators: {
       onSubmit:
@@ -64,7 +75,7 @@ export function AddCustomerForm({ onDone, onError }: AddCustomerFormProps) {
             ? { ...value, gstin: value.gstin }
             : { ...value, gstin: undefined };
 
-        const result = await createCustomer({
+        const payload = {
           name: bodyWithGstin.companyName,
           gstin: bodyWithGstin.gstin,
           companyName: bodyWithGstin.companyName,
@@ -79,7 +90,15 @@ export function AddCustomerForm({ onDone, onError }: AddCustomerFormProps) {
           openingBalance: bodyWithGstin.openingBalance,
           openingBalanceType: bodyWithGstin.openingBalanceType,
           placeOfSupply: bodyWithGstin.placeOfSupply,
-        });
+          organizationId: bodyWithGstin.organizationId || undefined,
+        };
+
+        const result = initialData
+          ? await updateCustomer({
+              customerId: initialData.id,
+              ...payload,
+            })
+          : await createCustomer(payload);
 
         if (!result.ok) {
           onError(result.message);
@@ -88,7 +107,11 @@ export function AddCustomerForm({ onDone, onError }: AddCustomerFormProps) {
 
         onDone();
       } catch {
-        onError("Could not create that customer. Please try again.");
+        onError(
+          initialData
+            ? "Could not update that customer. Please try again."
+            : "Could not create that customer. Please try again.",
+        );
       } finally {
         setPending(false);
       }
@@ -106,6 +129,29 @@ export function AddCustomerForm({ onDone, onError }: AddCustomerFormProps) {
       }}
       className="flex flex-col gap-5"
     >
+      {isAdmin && organizations && organizations.length > 0 && (
+        <form.Field name="organizationId">
+          {(field) => (
+            <Field>
+              <FieldLabel htmlFor={field.name}>Organization</FieldLabel>
+              <Select
+                id={field.name}
+                name={field.name}
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+                className="h-11 rounded-3xl"
+              >
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name} ({org.slug})
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+        </form.Field>
+      )}
+
       <Tabs
         value={gstTab}
         onValueChange={(value) => setGstTab(value as GstTab)}
@@ -508,7 +554,13 @@ export function AddCustomerForm({ onDone, onError }: AddCustomerFormProps) {
             disabled={pending}
           >
             <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.5} />
-            {pending ? "Creating…" : "Create customer"}
+            {pending
+              ? initialData
+                ? "Saving…"
+                : "Creating…"
+              : initialData
+                ? "Save changes"
+                : "Create customer"}
           </Button>
         </motion.div>
       </SheetFooter>

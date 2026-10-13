@@ -11,10 +11,8 @@ import {
   ListIcon,
   Package01Icon,
   Receipt,
-  Shield01Icon,
   ShoppingBag01Icon,
   TrendingUpIcon,
-  UserCheck01Icon,
   UserIcon,
   Wallet01Icon,
 } from "@hugeicons/core-free-icons";
@@ -140,17 +138,9 @@ export const navItems: NavItem[] = [
 ];
 
 export const adminNavItem: NavItem = {
-  href: "/admin",
-  label: "Admin",
-  icon: Shield01Icon,
-  children: [
-    { href: "/admin/users", label: "Users", icon: UserCheck01Icon },
-    {
-      href: "/admin/organizations",
-      label: "Organizations",
-      icon: Building03Icon,
-    },
-  ],
+  href: "/admin/organizations",
+  label: "Organizations",
+  icon: Building03Icon,
 };
 
 export function isActive(pathname: string, item: NavItem): boolean {

@@ -57,6 +57,7 @@ export function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState<SignUpStep>("details");
   const [email, setEmail] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export function SignUpForm() {
   const form = useForm({
     defaultValues: {
       name: "",
+      organizationName: "",
       email: "",
       password: "",
       termsAccepted: false,
@@ -125,6 +127,7 @@ export function SignUpForm() {
       }
 
       setEmail(value.email);
+      setOrganizationName(value.organizationName);
       otpForm.reset();
       setStep("otp");
     } catch (error) {
@@ -156,8 +159,8 @@ export function SignUpForm() {
         return;
       }
 
-      // Hand the account to our approval workflow (`app.user_profile`).
-      const registration = await registerAccount();
+      // Hand the account to our approval workflow (`app.organization`).
+      const registration = await registerAccount({ organizationName });
       if (!registration.ok) {
         setError(registration.message);
         return;
@@ -209,17 +212,17 @@ export function SignUpForm() {
 
   const title =
     step === "details"
-      ? "Create your account"
+      ? "Create your organization"
       : step === "otp"
         ? "Verify your email"
-        : "Account created";
+        : "Organization created";
 
   const description =
     step === "details"
-      ? "Request access to rjs-accounts."
+      ? "Register a new organization workspace."
       : step === "otp"
         ? `We sent a 6-digit code to ${email}.`
-        : "Your request is with our team for approval.";
+        : "Your organization workspace is awaiting approval.";
 
   return (
     <Reveal variant="scale-in" className="w-full max-w-md">
@@ -268,6 +271,40 @@ export function SignUpForm() {
                                 aria-invalid={isInvalid}
                                 placeholder="Jane Doe"
                                 autoComplete="name"
+                                className="h-11 rounded-xl px-3.5 text-base md:text-base focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
+                              />
+                              <Collapse show={isInvalid}>
+                                <FieldError errors={field.state.meta.errors} />
+                              </Collapse>
+                            </Field>
+                          </Reveal>
+                        );
+                      }}
+                    </form.Field>
+
+                    <form.Field name="organizationName">
+                      {(field) => {
+                        const isInvalid =
+                          field.state.meta.isTouched &&
+                          !field.state.meta.isValid;
+
+                        return (
+                          <Reveal delay={0.11}>
+                            <Field data-invalid={isInvalid}>
+                              <FieldLabel htmlFor={field.name}>
+                                Organization / Company name
+                              </FieldLabel>
+                              <Input
+                                id={field.name}
+                                name={field.name}
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(event) =>
+                                  field.handleChange(event.target.value)
+                                }
+                                aria-invalid={isInvalid}
+                                placeholder="Acme Logistics Pvt Ltd"
+                                autoComplete="organization"
                                 className="h-11 rounded-xl px-3.5 text-base md:text-base focus-visible:border-brand-blue focus-visible:ring-brand-blue/15"
                               />
                               <Collapse show={isInvalid}>
@@ -620,9 +657,9 @@ export function SignUpForm() {
                   </motion.span>
 
                   <p className="text-sm text-muted-foreground">
-                    Your email is verified. An administrator will review your
-                    request — you&apos;ll be able to sign in as soon as access
-                    is granted.
+                    Your email is verified. An administrator will review and
+                    approve your organization workspace — you&apos;ll be able to
+                    sign in as soon as access is granted.
                   </p>
 
                   <Link

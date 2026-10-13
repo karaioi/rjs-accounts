@@ -1,4 +1,4 @@
-import { UserCheck01Icon } from "@hugeicons/core-free-icons";
+import { Building03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -6,11 +6,7 @@ import { AccessSummary } from "@/components/access-summary";
 import { Reveal } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/server";
-import type {
-  MeResponse,
-  OrganizationItem,
-  PendingUser,
-} from "@/lib/api/types";
+import type { MeResponse, OrganizationItem } from "@/lib/api/types";
 
 export default async function DashboardPage() {
   const response = await apiFetch("/api/v1/me");
@@ -25,15 +21,12 @@ export default async function DashboardPage() {
   let pendingCount = 0;
   let allOrganizations: OrganizationItem[] = [];
   if (me?.is_platform_admin) {
-    const pendingResponse = await apiFetch("/api/v1/users?status=pending");
-    if (pendingResponse.ok) {
-      const pendingUsers: PendingUser[] = await pendingResponse.json();
-      pendingCount = pendingUsers.length;
-    }
-
     const orgsResponse = await apiFetch("/api/v1/organizations");
     if (orgsResponse.ok) {
       allOrganizations = await orgsResponse.json();
+      pendingCount = allOrganizations.filter(
+        (org) => org.status === "pending",
+      ).length;
     }
   }
 
@@ -48,14 +41,14 @@ export default async function DashboardPage() {
             </p>
           </div>
           {me?.is_platform_admin && pendingCount > 0 && (
-            <Link href="/admin/users">
+            <Link href="/admin/organizations">
               <Button className="rounded-3xl">
                 <HugeiconsIcon
-                  icon={UserCheck01Icon}
+                  icon={Building03Icon}
                   size={16}
                   strokeWidth={1.5}
                 />
-                Review pending accounts ({pendingCount})
+                Review pending organizations ({pendingCount})
               </Button>
             </Link>
           )}

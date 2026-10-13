@@ -80,9 +80,20 @@ class Customer(TimestampsMixin, Base):
     opening_balance: Mapped[str | None] = mapped_column(Text)
     opening_balance_type: Mapped[str | None] = mapped_column(Text)
     place_of_supply: Mapped[str | None] = mapped_column(Text)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(f"{SCHEMA}.organization.id", ondelete="CASCADE"),
+    )
 
     organizations: Mapped[list[Organization]] = relationship(
-        back_populates="customer", cascade="all, delete-orphan"
+        back_populates="customer",
+        foreign_keys="[Organization.customer_id]",
+        passive_deletes=True,
+    )
+    organization: Mapped[Organization | None] = relationship(
+        "Organization",
+        foreign_keys=[organization_id],
+        post_update=True,
     )
 
 
@@ -128,7 +139,11 @@ class Organization(TimestampsMixin, Base):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    customer: Mapped[Customer] = relationship(back_populates="organizations")
+    customer: Mapped[Customer] = relationship(
+        back_populates="organizations",
+        foreign_keys=[customer_id],
+        passive_deletes=True,
+    )
     memberships: Mapped[list[Membership]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
