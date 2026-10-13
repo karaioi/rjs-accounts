@@ -2,8 +2,9 @@
 
 import { headers } from "next/headers";
 
+import { checkAccountStatus } from "@/lib/api/actions";
 import { apiFetch } from "@/lib/api/server";
-import type { MeResponse } from "@/lib/api/types";
+import type { AccountStatusResponse, MeResponse } from "@/lib/api/types";
 import { describeAuthError, TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 import { checkAuthRateLimit } from "@/lib/auth/rate-limit";
 import { auth } from "@/lib/auth/server";
@@ -34,10 +35,23 @@ import { otpSchema } from "@/lib/validations/otp";
  * the client.
  */
 
-export type AuthActionResult = { ok: true } | { ok: false; message: string };
+export type AuthActionResult =
+  | { ok: true }
+  | {
+      ok: false;
+      message: string;
+      notApproved?: boolean;
+      statusResult?: AccountStatusResponse;
+    };
 
 export type OtpResult =
-  | { ok: true; destination: "/dashboard" | "/pending" }
+  | { ok: true; destination: "/dashboard"; notApproved?: false }
+  | {
+      ok: true;
+      destination?: never;
+      notApproved: true;
+      statusResult: AccountStatusResponse;
+    }
   | { ok: false; message: string };
 
 /** The parts of the login schema this flow needs; the consents are the form's. */
@@ -97,6 +111,19 @@ export async function startSignIn(input: {
     return {
       ok: false,
       message: describeAuthError(error, "Invalid email or password."),
+    };
+  }
+
+  // Neon Auth verified credentials and issued the session cookie.
+  // Check whether the account is approved in the database:
+  const statusRes = await checkAccountStatus(email);
+  if (statusRes.ok && statusRes.data.status !== "active") {
+    await clearSignInEmail();
+    return {
+      ok: false,
+      message: "Your account is not approved yet.",
+      notApproved: true,
+      statusResult: statusRes.data,
     };
   }
 
@@ -223,12 +250,30 @@ export async function completeSignIn(): Promise<OtpResult> {
   await clearSignInEmail();
 
   // Approval is the remaining gate: a `pending` account keeps its session but
-  // goes to the waiting screen.
+  // should not route to /pending. Instead return notApproved with the status details.
   const account = await apiFetch("/api/v1/me");
   if (account.ok) {
     const profile = (await account.json()) as MeResponse;
     if (!profile.is_platform_admin && profile.account_status !== "active") {
-      return { ok: true, destination: "/pending" };
+      const statusRes = profile.email
+        ? await checkAccountStatus(profile.email)
+        : null;
+      return {
+        ok: true,
+        notApproved: true,
+        statusResult: statusRes?.ok
+          ? statusRes.data
+          : {
+              email: profile.email ?? "",
+              status:
+                (profile.account_status as AccountStatusResponse["status"]) ||
+                "pending",
+              name: profile.name,
+              email_verified: profile.email_verified,
+              created_at: null,
+              approved_at: null,
+            },
+      };
     }
   }
 

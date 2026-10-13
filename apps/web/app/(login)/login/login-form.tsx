@@ -21,6 +21,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { SPRING_POP, SPRING_SOFT } from "@/components/motion/variants";
 import { OtpField } from "@/components/otp-field";
 import { PasswordRequirements } from "@/components/password-requirements";
+import { StatusDialog } from "@/components/status-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -49,6 +50,8 @@ import {
   startSignIn as startSignInAction,
   verifyCode,
 } from "@/lib/auth/actions";
+import { checkAccountStatus } from "@/lib/api/actions";
+import type { AccountStatusResponse } from "@/lib/api/types";
 import { type LoginValues, loginSchema } from "@/lib/validations/login";
 import { otpSchema } from "@/lib/validations/otp";
 
@@ -64,6 +67,9 @@ export function LoginForm({ initialEmail = null }: LoginFormProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [statusResult, setStatusResult] =
+    useState<AccountStatusResponse | null>(null);
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -101,6 +107,11 @@ export function LoginForm({ initialEmail = null }: LoginFormProps) {
       });
 
       if (!result.ok) {
+        if (result.notApproved && result.statusResult) {
+          setStatusResult(result.statusResult);
+          setShowStatusDialog(true);
+          return;
+        }
         setError(result.message);
         return;
       }
@@ -144,6 +155,12 @@ export function LoginForm({ initialEmail = null }: LoginFormProps) {
 
       if (!result.ok) {
         setError(result.message);
+        return;
+      }
+
+      if (result.notApproved) {
+        setStatusResult(result.statusResult);
+        setShowStatusDialog(true);
         return;
       }
 
@@ -380,12 +397,34 @@ export function LoginForm({ initialEmail = null }: LoginFormProps) {
                     >
                       |
                     </span>
-                    <Link
-                      href="/pending"
-                      className="font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const currentEmail =
+                          form.getFieldValue("email")?.trim() || email?.trim();
+                        if (currentEmail?.includes("@")) {
+                          setPending(true);
+                          try {
+                            const res = await checkAccountStatus(currentEmail);
+                            if (res.ok) {
+                              setStatusResult(res.data);
+                              setShowStatusDialog(true);
+                            } else {
+                              setError(res.message);
+                            }
+                          } catch {
+                            setError("Could not check account status.");
+                          } finally {
+                            setPending(false);
+                          }
+                        } else {
+                          router.push("/pending");
+                        }
+                      }}
+                      className="cursor-pointer font-medium text-brand-blue underline-offset-4 hover:text-brand-blue/80 hover:underline"
                     >
                       Check status
-                    </Link>
+                    </button>
                   </p>
                 </Reveal>
               </motion.div>
@@ -532,6 +571,17 @@ export function LoginForm({ initialEmail = null }: LoginFormProps) {
           }
           message={error}
           onClose={() => setError(null)}
+        />
+
+        <StatusDialog
+          open={showStatusDialog}
+          onClose={() => {
+            setShowStatusDialog(false);
+            if (step === "otp") {
+              setStep("credentials");
+            }
+          }}
+          result={statusResult}
         />
       </Card>
     </Reveal>
