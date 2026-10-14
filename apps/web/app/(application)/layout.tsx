@@ -31,7 +31,9 @@ export default async function ApplicationLayout({
           accountStatus: me.account_status,
         }}
       />
-      <main className="flex-1 overflow-y-auto scroll-smooth">{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto scroll-smooth flex flex-col">
+        {children}
+      </main>
     </div>
   );
 }

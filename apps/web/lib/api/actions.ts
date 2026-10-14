@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { apiFetch } from "@/lib/api/server";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 import { consume } from "@/lib/rate-limit";
-import type { AccountStatusResponse } from "./types";
+import type { AccountStatusResponse, CustomerActivity } from "./types";
 
 /**
  * Named Server Actions for the FastAPI calls the browser makes.
@@ -312,7 +312,11 @@ export async function createCustomer(input: {
     try {
       const data = await response.json();
       if (data?.detail) {
-        message = typeof data.detail === "string" ? data.detail : message;
+        if (typeof data.detail === "string") {
+          message = data.detail;
+        } else if (Array.isArray(data.detail) && data.detail[0]?.msg) {
+          message = data.detail[0].msg;
+        }
       }
     } catch {
       // Response body wasn't JSON — keep the default message.
@@ -327,7 +331,7 @@ export async function createCustomer(input: {
 export async function updateCustomer(input: {
   customerId: string;
   name: string;
-  gstin?: string;
+  gstin?: string | null;
   companyName?: string;
   location?: string;
   address1?: string;
@@ -384,7 +388,11 @@ export async function updateCustomer(input: {
     try {
       const data = await response.json();
       if (data?.detail) {
-        message = typeof data.detail === "string" ? data.detail : message;
+        if (typeof data.detail === "string") {
+          message = data.detail;
+        } else if (Array.isArray(data.detail) && data.detail[0]?.msg) {
+          message = data.detail[0].msg;
+        }
       }
     } catch {
       // Response body wasn't JSON — keep the default message.
@@ -433,6 +441,40 @@ export async function deleteCustomer(input: {
   }
 
   return { ok: true };
+}
+
+export type GetCustomerActivityResult =
+  | { ok: true; items: CustomerActivity[] }
+  | { ok: false; message: string };
+
+/** Retrieve audit activity history for a specific customer. */
+export async function getCustomerActivity(input: {
+  customerId: string;
+}): Promise<GetCustomerActivityResult> {
+  const cleanId = input.customerId.trim();
+  if (!cleanId) {
+    return { ok: false, message: "Invalid customer ID" };
+  }
+
+  const response = await apiFetch(`/api/v1/customers/${cleanId}/activity`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    let message = "Could not load customer activity history.";
+    try {
+      const data = await response.json();
+      if (data?.detail) {
+        message = typeof data.detail === "string" ? data.detail : message;
+      }
+    } catch {
+      // Body wasn't JSON
+    }
+    return { ok: false, message };
+  }
+
+  const items = (await response.json()) as CustomerActivity[];
+  return { ok: true, items };
 }
 
 export type CheckStatusResult =

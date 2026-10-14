@@ -49,6 +49,18 @@ export const CUSTOMER_STATUS_TONE: Record<string, string> = {
   archived: "bg-slate-500/20 text-slate-600 border-slate-500/30",
 };
 
+/** Deterministic palette for initials avatars across customer components. */
+export const CUSTOMER_AVATAR_COLORS = [
+  "bg-[#c2410c] text-white", // amber/orange
+  "bg-[#1e3a8a] text-white", // navy/blue
+  "bg-[#047857] text-white", // emerald/green
+  "bg-[#7c3aed] text-white", // purple
+  "bg-[#0284c7] text-white", // sky blue
+  "bg-[#b45309] text-white", // bronze/amber
+  "bg-[#be185d] text-white", // rose/pink
+  "bg-[#334155] text-white", // slate
+] as const;
+
 export const CUSTOMER_FIELD_LABELS = {
   customerName: "Customer Name",
   slug: "Slug",

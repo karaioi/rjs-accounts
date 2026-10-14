@@ -4,6 +4,7 @@
 export interface Customer {
   id: string;
   name: string;
+  slug?: string;
   status: string;
   organization_id: string | null;
   organization_name: string | null;
@@ -31,6 +32,40 @@ export interface CustomerListResponse {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+/** Snapshot of customer state before or after a mutation, based on app.customer */
+export interface CustomerSnapshot {
+  name?: string | null;
+  slug?: string | null;
+  status?: string | null;
+  gstin?: string | null;
+  company_name?: string | null;
+  location?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  pincode?: string | null;
+  state?: string | null;
+  email?: string | null;
+  contact_mobile?: string | null;
+  contact_telephone?: string | null;
+  opening_balance?: string | null;
+  opening_balance_type?: string | null;
+  place_of_supply?: string | null;
+  organization_id?: string | null;
+}
+
+/** `GET /api/v1/customers/{id}/activity` */
+export interface CustomerActivity {
+  id: number;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  actor_user_id: string | null;
+  actor_name: string | null;
+  before: CustomerSnapshot | null;
+  after: CustomerSnapshot | null;
+  created_at: string;
 }
 
 export interface Membership {

@@ -5,9 +5,19 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { FormMessage } from "@/components/auth-message";
 import { Collapse } from "@/components/motion/collapse";
 import { SPRING_SOFT } from "@/components/motion/variants";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "cn";
 import {
   Field,
   FieldError,
@@ -27,10 +37,7 @@ import {
   CUSTOMER_PLACEHOLDERS,
   type GstTab,
 } from "@/lib/data/customers";
-import {
-  gstRegisteredSchema,
-  gstUnregisteredSchema,
-} from "@/lib/validations/customer";
+import { customerSchema } from "@/lib/validations/customer";
 
 export function AddCustomerForm({
   onDone,
@@ -39,13 +46,52 @@ export function AddCustomerForm({
   organizations,
   initialData,
 }: AddCustomerFormProps) {
+  const isEdit = Boolean(initialData);
+  const defaultIsGst = Boolean(initialData?.gstin);
   const [pending, setPending] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [gstTab, setGstTab] = useState<GstTab>(
-    initialData?.gstin ? "registered" : "unregistered",
+    defaultIsGst ? "registered" : "unregistered",
   );
+  const [pendingGstTabChange, setPendingGstTabChange] = useState<GstTab | null>(
+    null,
+  );
+
+  function applyTabChange(targetTab: GstTab) {
+    setGstTab(targetTab);
+    form.setFieldValue("isGstRegistered", targetTab === "registered");
+    if (targetTab === "unregistered") {
+      form.setFieldValue("gstin", "");
+    }
+  }
+
+  function handleTabChangeRequest(value: string) {
+    const targetTab = value as GstTab;
+    if (targetTab === gstTab) return;
+
+    if (isEdit) {
+      // In edit customer mode: prompt confirmation before changing tab
+      setPendingGstTabChange(targetTab);
+    } else {
+      // In create customer mode: change directly
+      applyTabChange(targetTab);
+    }
+  }
+
+  function handleConfirmTabChange() {
+    if (pendingGstTabChange) {
+      applyTabChange(pendingGstTabChange);
+      setPendingGstTabChange(null);
+    }
+  }
+
+  function handleCancelTabChange() {
+    setPendingGstTabChange(null);
+  }
 
   const form = useForm({
     defaultValues: {
+      isGstRegistered: defaultIsGst,
       organizationId:
         initialData?.organization_id ?? organizations?.[0]?.id ?? "",
       gstin: initialData?.gstin ?? "",
@@ -64,33 +110,32 @@ export function AddCustomerForm({
         (initialData?.opening_balance_type as "credit" | "debit") ?? "credit",
     },
     validators: {
-      onSubmit:
-        gstTab === "registered" ? gstRegisteredSchema : gstUnregisteredSchema,
+      onSubmit: customerSchema,
     },
     onSubmit: async ({ value }) => {
       setPending(true);
+      setFormError(null);
       try {
-        const bodyWithGstin =
-          gstTab === "registered"
-            ? { ...value, gstin: value.gstin }
-            : { ...value, gstin: undefined };
+        const isRegistered = gstTab === "registered" && value.isGstRegistered;
+        const gstinValue =
+          isRegistered && value.gstin.trim() ? value.gstin.trim() : "";
 
         const payload = {
-          name: bodyWithGstin.companyName,
-          gstin: bodyWithGstin.gstin,
-          companyName: bodyWithGstin.companyName,
-          location: bodyWithGstin.location,
-          address1: bodyWithGstin.address1,
-          address2: bodyWithGstin.address2,
-          pincode: bodyWithGstin.pincode,
-          state: bodyWithGstin.state,
-          email: bodyWithGstin.email,
-          contactMobile: bodyWithGstin.contactMobile,
-          contactTelephone: bodyWithGstin.contactTelephone,
-          openingBalance: bodyWithGstin.openingBalance,
-          openingBalanceType: bodyWithGstin.openingBalanceType,
-          placeOfSupply: bodyWithGstin.placeOfSupply,
-          organizationId: bodyWithGstin.organizationId || undefined,
+          name: value.companyName.trim(),
+          gstin: gstinValue,
+          companyName: value.companyName.trim(),
+          location: value.location || undefined,
+          address1: value.address1 || undefined,
+          address2: value.address2 || undefined,
+          pincode: value.pincode || undefined,
+          state: value.state || undefined,
+          email: value.email || undefined,
+          contactMobile: value.contactMobile || undefined,
+          contactTelephone: value.contactTelephone || undefined,
+          openingBalance: value.openingBalance || undefined,
+          openingBalanceType: value.openingBalanceType,
+          placeOfSupply: value.placeOfSupply || undefined,
+          organizationId: value.organizationId || undefined,
         };
 
         const result = initialData
@@ -98,20 +143,24 @@ export function AddCustomerForm({
               customerId: initialData.id,
               ...payload,
             })
-          : await createCustomer(payload);
+          : await createCustomer({
+              ...payload,
+              gstin: gstinValue || undefined,
+            });
 
         if (!result.ok) {
+          setFormError(result.message);
           onError(result.message);
           return;
         }
 
         onDone();
       } catch {
-        onError(
-          initialData
-            ? "Could not update that customer. Please try again."
-            : "Could not create that customer. Please try again.",
-        );
+        const msg = initialData
+          ? "Could not update that customer. Please try again."
+          : "Could not create that customer. Please try again.";
+        setFormError(msg);
+        onError(msg);
       } finally {
         setPending(false);
       }
@@ -125,10 +174,13 @@ export function AddCustomerForm({
       noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        setFormError(null);
         form.handleSubmit();
       }}
       className="flex flex-col gap-5"
     >
+      {formError && <FormMessage tone="error">{formError}</FormMessage>}
+
       {isAdmin && organizations && organizations.length > 0 && (
         <form.Field name="organizationId">
           {(field) => (
@@ -152,10 +204,7 @@ export function AddCustomerForm({
         </form.Field>
       )}
 
-      <Tabs
-        value={gstTab}
-        onValueChange={(value) => setGstTab(value as GstTab)}
-      >
+      <Tabs value={gstTab} onValueChange={handleTabChangeRequest}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="registered">GST Registered</TabsTrigger>
           <TabsTrigger value="unregistered">GST Unregistered</TabsTrigger>
@@ -166,7 +215,9 @@ export function AddCustomerForm({
             <form.Field name="gstin">
               {(field) => {
                 const isInvalid =
-                  field.state.meta.isTouched && !field.state.meta.isValid;
+                  !field.state.meta.isValid &&
+                  (field.state.meta.isTouched ||
+                    field.state.meta.errors.length > 0);
                 return (
                   <Field data-invalid={isInvalid}>
                     <FieldLabel htmlFor={field.name}>
@@ -203,7 +254,9 @@ export function AddCustomerForm({
         <form.Field name="companyName">
           {(field) => {
             const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+              !field.state.meta.isValid &&
+              (field.state.meta.isTouched ||
+                field.state.meta.errors.length > 0);
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>
@@ -230,7 +283,9 @@ export function AddCustomerForm({
         <form.Field name="location">
           {(field) => {
             const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+              !field.state.meta.isValid &&
+              (field.state.meta.isTouched ||
+                field.state.meta.errors.length > 0);
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>
@@ -257,7 +312,9 @@ export function AddCustomerForm({
         <form.Field name="address1">
           {(field) => {
             const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+              !field.state.meta.isValid &&
+              (field.state.meta.isTouched ||
+                field.state.meta.errors.length > 0);
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>
@@ -284,7 +341,9 @@ export function AddCustomerForm({
         <form.Field name="address2">
           {(field) => {
             const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+              !field.state.meta.isValid &&
+              (field.state.meta.isTouched ||
+                field.state.meta.errors.length > 0);
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>
@@ -311,7 +370,9 @@ export function AddCustomerForm({
         <form.Field name="placeOfSupply">
           {(field) => {
             const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+              !field.state.meta.isValid &&
+              (field.state.meta.isTouched ||
+                field.state.meta.errors.length > 0);
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>
@@ -339,7 +400,9 @@ export function AddCustomerForm({
           <form.Field name="pincode">
             {(field) => {
               const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
+                !field.state.meta.isValid &&
+                (field.state.meta.isTouched ||
+                  field.state.meta.errors.length > 0);
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
@@ -366,7 +429,9 @@ export function AddCustomerForm({
           <form.Field name="state">
             {(field) => {
               const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
+                !field.state.meta.isValid &&
+                (field.state.meta.isTouched ||
+                  field.state.meta.errors.length > 0);
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
@@ -394,7 +459,9 @@ export function AddCustomerForm({
         <form.Field name="email">
           {(field) => {
             const isInvalid =
-              field.state.meta.isTouched && !field.state.meta.isValid;
+              !field.state.meta.isValid &&
+              (field.state.meta.isTouched ||
+                field.state.meta.errors.length > 0);
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>
@@ -423,7 +490,9 @@ export function AddCustomerForm({
           <form.Field name="contactMobile">
             {(field) => {
               const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
+                !field.state.meta.isValid &&
+                (field.state.meta.isTouched ||
+                  field.state.meta.errors.length > 0);
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
@@ -451,7 +520,9 @@ export function AddCustomerForm({
           <form.Field name="contactTelephone">
             {(field) => {
               const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
+                !field.state.meta.isValid &&
+                (field.state.meta.isTouched ||
+                  field.state.meta.errors.length > 0);
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
@@ -503,7 +574,9 @@ export function AddCustomerForm({
           <form.Field name="openingBalance">
             {(field) => {
               const isInvalid =
-                field.state.meta.isTouched && !field.state.meta.isValid;
+                !field.state.meta.isValid &&
+                (field.state.meta.isTouched ||
+                  field.state.meta.errors.length > 0);
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
@@ -536,7 +609,10 @@ export function AddCustomerForm({
           type="button"
           variant="outline"
           className="rounded-3xl"
-          onClick={() => form.reset()}
+          onClick={() => {
+            setFormError(null);
+            form.reset();
+          }}
           disabled={pending}
         >
           <HugeiconsIcon icon={RefreshIcon} size={16} strokeWidth={1.5} />
@@ -564,6 +640,56 @@ export function AddCustomerForm({
           </Button>
         </motion.div>
       </SheetFooter>
+
+      {/* Confirmation Dialog when switching GST Registered <-> Unregistered in Edit mode */}
+      <Dialog
+        open={Boolean(pendingGstTabChange)}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancelTabChange();
+          }
+        }}
+      >
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingGstTabChange === "unregistered"
+                ? "Change to GST Unregistered?"
+                : "Change to GST Registered?"}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingGstTabChange === "unregistered"
+                ? `Changing this customer to Unregistered will permanently clear their GSTIN (${initialData?.gstin || "recorded GSTIN"}) upon saving. Are you sure you want to proceed?`
+                : "Changing this customer to GST Registered will require providing a valid 15-character GSTIN before saving. Are you sure you want to proceed?"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-3xl"
+              onClick={handleCancelTabChange}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className={cn(
+                "rounded-3xl shadow-sm text-white",
+                pendingGstTabChange === "unregistered"
+                  ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20"
+                  : "bg-brand-green hover:bg-brand-green/90 shadow-brand-green/20",
+              )}
+              onClick={handleConfirmTabChange}
+            >
+              {pendingGstTabChange === "unregistered"
+                ? "Yes, change to Unregistered"
+                : "Yes, change to Registered"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

@@ -19,8 +19,13 @@ from sqlalchemy.orm import Session
 
 from ..auth.deps import Principal, require_verified_login
 from ..db import get_session
-from ..models import Customer, Membership, Organization
-from ..schemas import CustomerCreate, CustomerOut, CustomerUpdate
+from ..models import AuditLog, Customer, Membership, Organization, neon_auth_user
+from ..schemas import (
+    CustomerActivityOut,
+    CustomerCreate,
+    CustomerOut,
+    CustomerUpdate,
+)
 from ..services.audit import write_audit
 from ..services.rate_limit import enforce
 
@@ -104,6 +109,8 @@ def list_customers(
     if principal.is_platform_admin:
         if organization_id:
             stmt = stmt.where(Customer.organization_id == organization_id)
+        else:
+            stmt = stmt.where(Customer.organization_id.isnot(None))
     else:
         user_org = _resolve_user_organization(session, principal.user_id)
         if not user_org:
@@ -239,7 +246,23 @@ def create_customer(
         entity_id=str(customer.id),
         customer_id=customer.id,
         organization_id=customer.organization_id,
-        after={"name": customer.name, "organization_id": str(customer.organization_id) if customer.organization_id else None},
+        after={
+            "name": customer.name,
+            "company_name": customer.company_name,
+            "gstin": customer.gstin,
+            "location": customer.location,
+            "address1": customer.address1,
+            "address2": customer.address2,
+            "pincode": customer.pincode,
+            "state": customer.state,
+            "email": customer.email,
+            "contact_mobile": customer.contact_mobile,
+            "contact_telephone": customer.contact_telephone,
+            "opening_balance": customer.opening_balance,
+            "opening_balance_type": customer.opening_balance_type,
+            "place_of_supply": customer.place_of_supply,
+            "organization_id": str(customer.organization_id) if customer.organization_id else None,
+        },
         request=request,
     )
     session.commit()
@@ -303,39 +326,74 @@ def update_customer(
                 detail="You do not have permission to update customers",
             )
 
-    before = {"name": customer.name, "company_name": customer.company_name}
+    before = {
+        "name": customer.name,
+        "company_name": customer.company_name,
+        "gstin": customer.gstin,
+        "location": customer.location,
+        "address1": customer.address1,
+        "address2": customer.address2,
+        "pincode": customer.pincode,
+        "state": customer.state,
+        "email": customer.email,
+        "contact_mobile": customer.contact_mobile,
+        "contact_telephone": customer.contact_telephone,
+        "opening_balance": customer.opening_balance,
+        "opening_balance_type": customer.opening_balance_type,
+        "place_of_supply": customer.place_of_supply,
+        "organization_id": str(customer.organization_id) if customer.organization_id else None,
+    }
 
-    if body.name is not None:
+    fields_set = body.model_fields_set
+    if "name" in fields_set and body.name is not None:
         customer.name = body.name
-    if body.company_name is not None:
+    if "company_name" in fields_set:
         customer.company_name = body.company_name
-    if body.gstin is not None:
-        customer.gstin = body.gstin
-    if body.location is not None:
+    if "gstin" in fields_set:
+        customer.gstin = body.gstin or None
+    if "location" in fields_set:
         customer.location = body.location
-    if body.address1 is not None:
+    if "address1" in fields_set:
         customer.address1 = body.address1
-    if body.address2 is not None:
+    if "address2" in fields_set:
         customer.address2 = body.address2
-    if body.pincode is not None:
+    if "pincode" in fields_set:
         customer.pincode = body.pincode
-    if body.state is not None:
+    if "state" in fields_set:
         customer.state = body.state
-    if body.email is not None:
+    if "email" in fields_set:
         customer.email = body.email
-    if body.contact_mobile is not None:
+    if "contact_mobile" in fields_set:
         customer.contact_mobile = body.contact_mobile
-    if body.contact_telephone is not None:
+    if "contact_telephone" in fields_set:
         customer.contact_telephone = body.contact_telephone
-    if body.opening_balance is not None:
+    if "opening_balance" in fields_set:
         customer.opening_balance = body.opening_balance
-    if body.opening_balance_type is not None:
+    if "opening_balance_type" in fields_set:
         customer.opening_balance_type = body.opening_balance_type
-    if body.place_of_supply is not None:
+    if "place_of_supply" in fields_set:
         customer.place_of_supply = body.place_of_supply
 
-    if principal.is_platform_admin and body.organization_id is not None:
+    if principal.is_platform_admin and "organization_id" in fields_set:
         customer.organization_id = body.organization_id
+
+    after = {
+        "name": customer.name,
+        "company_name": customer.company_name,
+        "gstin": customer.gstin,
+        "location": customer.location,
+        "address1": customer.address1,
+        "address2": customer.address2,
+        "pincode": customer.pincode,
+        "state": customer.state,
+        "email": customer.email,
+        "contact_mobile": customer.contact_mobile,
+        "contact_telephone": customer.contact_telephone,
+        "opening_balance": customer.opening_balance,
+        "opening_balance_type": customer.opening_balance_type,
+        "place_of_supply": customer.place_of_supply,
+        "organization_id": str(customer.organization_id) if customer.organization_id else None,
+    }
 
     write_audit(
         session,
@@ -346,7 +404,7 @@ def update_customer(
         customer_id=customer.id,
         organization_id=customer.organization_id,
         before=before,
-        after={"name": customer.name, "company_name": customer.company_name},
+        after=after,
         request=request,
     )
     session.commit()
@@ -374,6 +432,16 @@ def delete_customer(
             status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
         )
 
+    # Prevent deleting root tenant customer accounts linked to an organization workspace
+    has_orgs = session.execute(
+        select(Organization.id).where(Organization.customer_id == customer_id)
+    ).first()
+    if has_orgs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete a customer account that is linked to an organization workspace",
+        )
+
     if not principal.is_platform_admin:
         user_org = _resolve_user_organization(session, principal.user_id)
         if not user_org or customer.organization_id != user_org[0]:
@@ -399,3 +467,66 @@ def delete_customer(
     )
     session.execute(delete(Customer).where(Customer.id == customer_id))
     session.commit()
+
+
+@router.get("/{customer_id}/activity", response_model=list[CustomerActivityOut])
+def get_customer_activity(
+    customer_id: uuid.UUID,
+    principal: Principal = Depends(require_verified_login),
+    session: Session = Depends(get_session),
+) -> list[CustomerActivityOut]:
+    """Get audit activity history for a specific customer."""
+    customer = session.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
+        )
+
+    if not principal.is_platform_admin:
+        user_org = _resolve_user_organization(session, principal.user_id)
+        if not user_org or customer.organization_id != user_org[0]:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found"
+            )
+
+    stmt = (
+        select(AuditLog)
+        .where(
+            (AuditLog.customer_id == customer_id)
+            | (
+                (AuditLog.entity_type == "customer")
+                & (AuditLog.entity_id == str(customer_id))
+            )
+        )
+        .order_by(AuditLog.created_at.desc())
+        .limit(50)
+    )
+    logs = list(session.execute(stmt).scalars().all())
+
+    actor_ids = {log.actor_user_id for log in logs if log.actor_user_id is not None}
+    actor_names: dict[uuid.UUID, str] = {}
+    if actor_ids:
+        user_rows = session.execute(
+            select(neon_auth_user.c.id, neon_auth_user.c.name, neon_auth_user.c.email)
+            .where(neon_auth_user.c.id.in_(actor_ids))
+        ).all()
+        for row in user_rows:
+            actor_names[row.id] = row.name or row.email or "Workspace User"
+
+    out: list[CustomerActivityOut] = []
+    for log in logs:
+        actor_name = actor_names.get(log.actor_user_id) if log.actor_user_id else None
+        out.append(
+            CustomerActivityOut(
+                id=log.id,
+                action=log.action,
+                entity_type=log.entity_type,
+                entity_id=log.entity_id,
+                actor_user_id=log.actor_user_id,
+                actor_name=actor_name,
+                before=log.before,
+                after=log.after,
+                created_at=log.created_at,
+            )
+        )
+    return out

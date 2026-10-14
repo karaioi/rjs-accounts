@@ -196,6 +196,44 @@ class AuditLogOut(BaseModel):
     created_at: datetime
 
 
+class CustomerSnapshot(BaseModel):
+    """Snapshot of customer state before or after a mutation, based on app.customer."""
+
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+    name: str | None = None
+    slug: str | None = None
+    status: str | None = None
+    gstin: str | None = None
+    company_name: str | None = None
+    location: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    pincode: str | None = None
+    state: str | None = None
+    email: str | None = None
+    contact_mobile: str | None = None
+    contact_telephone: str | None = None
+    opening_balance: str | None = None
+    opening_balance_type: str | None = None
+    place_of_supply: str | None = None
+    organization_id: str | None = None
+
+
+class CustomerActivityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    action: str
+    entity_type: str
+    entity_id: str | None
+    actor_user_id: uuid.UUID | None
+    actor_name: str | None = None
+    before: CustomerSnapshot | None = None
+    after: CustomerSnapshot | None = None
+    created_at: datetime
+
+
 class LoginVerificationOut(BaseModel):
     """State of the second sign-in step (the emailed OTP).
 
