@@ -1,6 +1,12 @@
 "use client";
 
-import { Add01Icon, RefreshIcon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  Alert02Icon,
+  CheckmarkCircle02Icon,
+  RefreshIcon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useForm } from "@tanstack/react-form";
 import { motion } from "motion/react";
@@ -29,7 +35,11 @@ import { Select } from "@/components/ui/select";
 import { SheetFooter } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { createCustomer, updateCustomer } from "@/lib/api/actions";
+import {
+  createCustomer,
+  lookupGstDetails,
+  updateCustomer,
+} from "@/lib/api/actions";
 import {
   type AddCustomerFormProps,
   CUSTOMER_FIELD_LABELS,
@@ -50,12 +60,81 @@ export function AddCustomerForm({
   const defaultIsGst = Boolean(initialData?.gstin);
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isFetchingGst, setIsFetchingGst] = useState(false);
+  const [gstFeedback, setGstFeedback] = useState<{
+    type: "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
   const [gstTab, setGstTab] = useState<GstTab>(
     defaultIsGst ? "registered" : "unregistered",
   );
   const [pendingGstTabChange, setPendingGstTabChange] = useState<GstTab | null>(
     null,
   );
+
+  async function handleAutofillGst(gstinInput?: string) {
+    const raw = gstinInput ?? form.getFieldValue("gstin");
+    const clean = raw?.trim() ?? "";
+    if (!clean) {
+      setGstFeedback({ type: "error", message: "Please enter a GSTIN first." });
+      return;
+    }
+
+    setIsFetchingGst(true);
+    setGstFeedback(null);
+
+    try {
+      const res = await lookupGstDetails({ gstin: clean });
+      if (!res.ok) {
+        setGstFeedback({
+          type: "error",
+          message: res.message || "Failed to validate GSTIN.",
+        });
+        return;
+      }
+
+      const { data, warning } = res;
+      // Auto-populate form fields
+      if (data.companyName) {
+        form.setFieldValue("companyName", data.companyName);
+      }
+      if (data.address1) {
+        form.setFieldValue("address1", data.address1);
+      }
+      if (data.address2) {
+        form.setFieldValue("address2", data.address2);
+      }
+      if (data.location) {
+        form.setFieldValue("location", data.location);
+      }
+      if (data.pincode) {
+        form.setFieldValue("pincode", data.pincode);
+      }
+      if (data.state) {
+        form.setFieldValue("state", data.state);
+      }
+      if (data.placeOfSupply) {
+        form.setFieldValue("placeOfSupply", data.placeOfSupply);
+      }
+
+      if (warning) {
+        setGstFeedback({ type: "warning", message: warning });
+      } else {
+        const title = data.companyName || data.legalName || clean;
+        setGstFeedback({
+          type: "success",
+          message: `Auto-filled details for "${title}" (${data.state || "Verified"}).`,
+        });
+      }
+    } catch {
+      setGstFeedback({
+        type: "error",
+        message: "An error occurred while fetching GST details.",
+      });
+    } finally {
+      setIsFetchingGst(false);
+    }
+  }
 
   function applyTabChange(targetTab: GstTab) {
     setGstTab(targetTab);
@@ -220,21 +299,82 @@ export function AddCustomerForm({
                     field.state.meta.errors.length > 0);
                 return (
                   <Field data-invalid={isInvalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      {CUSTOMER_FIELD_LABELS.gstin}
-                    </FieldLabel>
+                    <div className="flex items-center justify-between">
+                      <FieldLabel htmlFor={field.name}>
+                        {CUSTOMER_FIELD_LABELS.gstin}
+                      </FieldLabel>
+                      <button
+                        type="button"
+                        onClick={() => handleAutofillGst(field.state.value)}
+                        disabled={isFetchingGst || !field.state.value.trim()}
+                        className="text-xs font-semibold text-brand-blue hover:text-brand-blue/80 flex items-center gap-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors py-0.5"
+                      >
+                        <HugeiconsIcon
+                          icon={isFetchingGst ? RefreshIcon : SparklesIcon}
+                          size={13}
+                          strokeWidth={2}
+                          className={isFetchingGst ? "animate-spin" : ""}
+                        />
+                        <span>
+                          {isFetchingGst ? "Fetching..." : "Auto-fill Details"}
+                        </span>
+                      </button>
+                    </div>
+
                     <Input
                       id={field.name}
                       name={field.name}
                       value={field.state.value}
                       onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value)}
+                      onChange={(e) => {
+                        field.handleChange(e.target.value.toUpperCase());
+                        if (gstFeedback) setGstFeedback(null);
+                      }}
                       aria-invalid={isInvalid}
                       placeholder={CUSTOMER_PLACEHOLDERS.gstin}
-                      className="h-11 rounded-3xl font-mono"
+                      className="h-11 rounded-3xl font-mono uppercase tracking-wider"
                     />
+
                     <Collapse show={isInvalid}>
                       <FieldError errors={field.state.meta.errors} />
+                    </Collapse>
+
+                    {/* GST Autofill feedback banner */}
+                    <Collapse show={Boolean(gstFeedback)}>
+                      {gstFeedback && (
+                        <div
+                          className={cn(
+                            "mt-2 rounded-2xl p-3 text-xs flex items-start gap-2 border shadow-2xs",
+                            gstFeedback.type === "success" &&
+                              "bg-brand-green/10 text-brand-green border-brand-green/20",
+                            gstFeedback.type === "warning" &&
+                              "bg-brand-blue/10 text-brand-blue border-brand-blue/20",
+                            gstFeedback.type === "error" &&
+                              "bg-rose-50 text-rose-700 border-rose-200",
+                          )}
+                        >
+                          <HugeiconsIcon
+                            icon={
+                              gstFeedback.type === "success"
+                                ? CheckmarkCircle02Icon
+                                : Alert02Icon
+                            }
+                            size={15}
+                            strokeWidth={2}
+                            className="shrink-0 mt-0.5"
+                          />
+                          <div className="flex-1 leading-relaxed">
+                            {gstFeedback.message}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setGstFeedback(null)}
+                            className="text-[11px] underline shrink-0 hover:opacity-80 cursor-pointer ml-1"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
                     </Collapse>
                   </Field>
                 );

@@ -123,3 +123,21 @@ export interface AccountStatusResponse {
   created_at: string | null;
   approved_at: string | null;
 }
+
+/** Result shape for GST lookup & validation */
+export interface GstLookupData {
+  gstin: string;
+  legalName?: string;
+  companyName?: string;
+  status?: string;
+  state?: string;
+  placeOfSupply?: string;
+  address1?: string;
+  address2?: string;
+  location?: string;
+  pincode?: string;
+}
+
+export type GstLookupResult =
+  | { ok: true; data: GstLookupData; warning?: string }
+  | { ok: false; message: string };

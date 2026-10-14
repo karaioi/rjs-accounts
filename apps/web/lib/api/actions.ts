@@ -4,7 +4,13 @@ import { headers } from "next/headers";
 import { apiFetch } from "@/lib/api/server";
 import { TOO_MANY_ATTEMPTS } from "@/lib/auth/errors";
 import { consume } from "@/lib/rate-limit";
-import type { AccountStatusResponse, CustomerActivity } from "./types";
+import { validateGstin } from "@/lib/utils/gstin";
+import type {
+  AccountStatusResponse,
+  CustomerActivity,
+  GstLookupData,
+  GstLookupResult,
+} from "./types";
 
 /**
  * Named Server Actions for the FastAPI calls the browser makes.
@@ -525,4 +531,129 @@ export async function checkAccountStatus(
 
   const data: AccountStatusResponse = await response.json();
   return { ok: true, data };
+}
+
+/**
+ * Validate GSTIN checksum and optionally fetch taxpayer details (Legal Name, Address)
+ * from GSTINAPI / gstincheck.co.in using GSTIN_API_KEY from environment variables.
+ */
+export async function lookupGstDetails(input: {
+  gstin: string;
+}): Promise<GstLookupResult> {
+  const cleanGstin = input.gstin.trim().toUpperCase();
+
+  // 1. Run strict Mod-36 checksum and structure validation
+  const validation = validateGstin(cleanGstin);
+  if (!validation.isValid) {
+    return {
+      ok: false,
+      message: validation.error || "Invalid GSTIN format or checksum.",
+    };
+  }
+
+  const baseData: GstLookupData = {
+    gstin: cleanGstin,
+    state: validation.stateName,
+    placeOfSupply: validation.stateName,
+  };
+
+  // 2. Rate limit GST lookups per IP
+  const ip = await callerIp();
+  const limit = consume(`action:lookupGst:${ip}`, {
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (!limit.allowed) {
+    return { ok: false, message: TOO_MANY_ATTEMPTS };
+  }
+
+  // 3. Check for GSTIN_API_KEY in environment
+  const apiKey =
+    process.env.GSTIN_API_KEY ||
+    process.env.GST_API_KEY ||
+    process.env.APPYFLOW_KEY_SECRET;
+
+  if (!apiKey) {
+    return {
+      ok: true,
+      data: baseData,
+      warning:
+        "Checksum verified! Add GSTIN_API_KEY in .env.local to auto-fill Legal Name and Address (Free 100 requests at gstinapi.in).",
+    };
+  }
+
+  try {
+    // Attempt lookup via sheet.gstincheck.co.in or appyflow
+    const url = process.env.APPYFLOW_KEY_SECRET
+      ? `https://appyflow.in/api/verifyGST?gstNo=${cleanGstin}&key_secret=${apiKey}`
+      : `https://sheet.gstincheck.co.in/check/${apiKey}/${cleanGstin}`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) {
+      return {
+        ok: true,
+        data: baseData,
+        warning: `GST service responded with status ${res.status}. State auto-filled from checksum.`,
+      };
+    }
+
+    const payload = await res.json();
+    // Handle both gstincheck/GSTINAPI and Appyflow response formats
+    const data = payload?.data || payload?.taxpayerInfo || payload;
+
+    if (!data || payload?.flag === false || payload?.error === true) {
+      return {
+        ok: true,
+        data: baseData,
+        warning:
+          payload?.message ||
+          "Could not retrieve live registry record. State auto-filled.",
+      };
+    }
+
+    const addr = data?.pradr?.addr || data?.pradr || {};
+    const street = [addr?.bnno || addr?.bno, addr?.bnm, addr?.flno, addr?.st]
+      .filter(Boolean)
+      .join(", ");
+
+    const legalName = data?.lgnm || "";
+    const tradeName = data?.tradeNam || "";
+    const companyName = tradeName || legalName;
+    const location = addr?.dst || addr?.loc || validation.stateName || "";
+    const address2 = addr?.loc && addr?.dst ? addr.loc : "";
+    const pincode = addr?.pncd || "";
+    const state = addr?.state || validation.stateName || "";
+    const status = data?.gstinStatus || data?.sts || "Active";
+
+    return {
+      ok: true,
+      data: {
+        gstin: cleanGstin,
+        legalName,
+        companyName,
+        status,
+        state,
+        placeOfSupply: state,
+        address1: street || undefined,
+        address2: address2 || undefined,
+        location: location || undefined,
+        pincode: pincode || undefined,
+      },
+    };
+  } catch (err) {
+    const errorMsg =
+      err instanceof Error ? err.message : "Live network lookup timed out.";
+    return {
+      ok: true,
+      data: baseData,
+      warning: `${errorMsg} State auto-filled from checksum.`,
+    };
+  }
 }
